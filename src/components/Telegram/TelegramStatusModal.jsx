@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { X, Send, CheckCircle2, AlertCircle, Sparkles, User, ExternalLink } from 'lucide-react';
+import { X, Send, CheckCircle2, AlertCircle, Bot, ExternalLink } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
+
+const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'reminderveter_bot';
 
 export function TelegramStatusModal({ isOpen, onClose }) {
   const { isInTelegram, tgUser, manualChatId, saveManualChatId, activeUserId, triggerHaptic } = useTelegram();
@@ -20,7 +22,7 @@ export function TelegramStatusModal({ isOpen, onClose }) {
       setTestStatus({
         loading: false,
         msg: 'Вкажіть ваш Telegram Chat ID',
-        success: false
+        success: false,
       });
       return;
     }
@@ -34,31 +36,36 @@ export function TelegramStatusModal({ isOpen, onClose }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: activeUserId,
-          message: '🔔 Привіт! Це тестове сповіщення від твого Календаря нагадувань.'
-        })
+          message: '🔔 Привіт! Це тестове сповіщення від твого Календаря нагадувань.',
+        }),
       });
 
       const data = await response.json();
-      if (response.ok && data.ok) {
+      if (response.ok && (data.ok || data.result)) {
         setTestStatus({
           loading: false,
           msg: 'Повідомлення успішно доставлено у твій Telegram!',
-          success: true
+          success: true,
         });
         triggerHaptic('success');
       } else {
+        const errorMsg = data.error || data.description || 'Помилка надсилання у Telegram.';
         setTestStatus({
           loading: false,
-          msg: data.error || 'Не вдалося надіслати. Перевірте токен бота або запустіть бота /start.',
-          success: false
+          msg: errorMsg.includes('chat not found') || errorMsg.includes('blocked')
+            ? 'Бот не може написати першим! Спочатку запустіть бота в Telegram: натисніть "Відкрити @' +
+              BOT_USERNAME +
+              '" і надішліть /start.'
+            : errorMsg,
+          success: false,
         });
         triggerHaptic('error');
       }
     } catch (err) {
       setTestStatus({
         loading: false,
-        msg: 'Помилка виклику Netlify Function. Переконайтеся, що сайт задеплоєно на Netlify або запущено `netlify dev`.',
-        success: false
+        msg: 'Помилка виклику API відправки. Перевірте з’єднання або запустіть `npm run dev`.',
+        success: false,
       });
     }
   };
@@ -83,6 +90,30 @@ export function TelegramStatusModal({ isOpen, onClose }) {
 
         {/* Content */}
         <div className="p-4 space-y-4">
+          {/* Bot link card */}
+          <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-sky-500 text-white">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                  @{BOT_USERNAME}
+                </p>
+                <p className="text-[11px] text-slate-500">Календар нотаток бот</p>
+              </div>
+            </div>
+            <a
+              href={`https://t.me/${BOT_USERNAME}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+            >
+              <span>Запустити</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
           {isInTelegram ? (
             <div className="p-3.5 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60">
               <div className="flex items-center gap-2.5">
@@ -99,18 +130,11 @@ export function TelegramStatusModal({ isOpen, onClose }) {
                 </div>
               </div>
               <p className="mt-2 text-xs text-sky-800 dark:text-sky-300">
-                Ви відкрили календар через Telegram Mini App. Нагадування надсилатимуться автоматично в цей акаунт!
+                Календар відкрито всередині Telegram. Сповіщення приходитимуть прямо сюди!
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-800 dark:text-amber-300">
-                <p className="font-semibold mb-1">Звичайний браузер</p>
-                <p>
-                  Щоб отримувати нагадування з сайту, вкажіть ваш числовий Telegram Chat ID або відкрийте цей сайт як Telegram Mini App через вашого бота.
-                </p>
-              </div>
-
               <form onSubmit={handleSaveChatId} className="space-y-2">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Ваш Telegram Chat ID
@@ -131,7 +155,7 @@ export function TelegramStatusModal({ isOpen, onClose }) {
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  Дізнатись свій Chat ID можна написавши боту{' '}
+                  Дізнатись свій Chat ID можна у{' '}
                   <a
                     href="https://t.me/userinfobot"
                     target="_blank"
@@ -154,22 +178,22 @@ export function TelegramStatusModal({ isOpen, onClose }) {
             >
               <Send className="w-3.5 h-3.5" />
               <span>
-                {testStatus.loading ? 'Надсилаємо...' : 'Перевірити зв’язок (Тестовий пінг у Telegram)'}
+                {testStatus.loading ? 'Надсилаємо...' : 'Надіслати тестове сповіщення'}
               </span>
             </button>
 
             {testStatus.msg && (
               <div
-                className={`mt-2.5 p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                className={`mt-2.5 p-2.5 rounded-lg text-xs flex items-start gap-2 ${
                   testStatus.success
                     ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200'
                     : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200'
                 }`}
               >
                 {testStatus.success ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500 mt-0.5" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-500 mt-0.5" />
                 )}
                 <span>{testStatus.msg}</span>
               </div>
