@@ -18,7 +18,7 @@ export default async (req) => {
 
     const chatId = message.chat.id;
     const text = message.text || '';
-    const siteUrl = process.env.URL || 'https://app.netlify.com';
+    const siteUrl = process.env.URL || 'https://reminder-calendar-tg.netlify.app';
 
     if (text.startsWith('/start') || text.startsWith('/help')) {
       const replyText =
