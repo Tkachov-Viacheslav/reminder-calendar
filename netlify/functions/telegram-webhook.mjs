@@ -110,34 +110,155 @@ async function answerCallbackQuery(botToken, queryId, text) {
   }
 }
 
+function getNowInKyiv() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const p = {};
+  parts.forEach((x) => (p[x.type] = x.value));
+  return {
+    year: parseInt(p.year, 10),
+    month: parseInt(p.month, 10),
+    day: parseInt(p.day, 10),
+    hour: parseInt(p.hour === '24' ? '0' : p.hour, 10),
+    minute: parseInt(p.minute, 10),
+  };
+}
+
+function kyivToUtc(year, month, day, hour, minute) {
+  const isoStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
+  const targetLocalTime = new Date(isoStr).getTime();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Kyiv',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(new Date(isoStr));
+  const p = {};
+  parts.forEach((x) => (p[x.type] = x.value));
+  const kyivAsUtc = Date.UTC(
+    p.year,
+    p.month - 1,
+    p.day,
+    p.hour === '24' ? 0 : p.hour,
+    p.minute,
+    p.second
+  );
+  const offsetMs = kyivAsUtc - targetLocalTime;
+  return new Date(targetLocalTime - offsetMs);
+}
+
 function tryParseQuickReminder(text) {
-  const timeMatch = text.match(/\b([01]?\d|2[0-3])[:.]([0-5]\d)\b/);
-  if (!timeMatch) return null;
+  let workingText = text.trim();
+  const now = getNowInKyiv();
 
-  const hours = parseInt(timeMatch[1], 10);
-  const minutes = parseInt(timeMatch[2], 10);
-  const isTomorrow = /\bзавтра\b/i.test(text);
+  // 1. Time parsing: HH:MM with colon, or 'о/об HH(:MM)?'
+  let hours, minutes;
+  const colonTimeMatch = workingText.match(/(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)/);
+  const wordTimeMatch =
+    !colonTimeMatch &&
+    workingText.match(/(?:(?<!\p{L})(?:о|об)\s+)([01]?\d|2[0-3])(?::([0-5]\d))?(?!\d)/iu);
 
-  const targetDate = new Date();
-  if (isTomorrow) {
-    targetDate.setDate(targetDate.getDate() + 1);
+  if (colonTimeMatch) {
+    hours = parseInt(colonTimeMatch[1], 10);
+    minutes = parseInt(colonTimeMatch[2], 10);
+    workingText = workingText.replace(colonTimeMatch[0], ' ');
+  } else if (wordTimeMatch) {
+    hours = parseInt(wordTimeMatch[1], 10);
+    minutes = wordTimeMatch[2] ? parseInt(wordTimeMatch[2], 10) : 0;
+    workingText = workingText.replace(wordTimeMatch[0], ' ');
   }
-  targetDate.setHours(hours, minutes, 0, 0);
 
-  if (!isTomorrow && targetDate <= new Date()) {
-    targetDate.setDate(targetDate.getDate() + 1);
+  // 2. Date parsing: DD.MM.YYYY, DD.MM, or keywords
+  const fullDateMatch = workingText.match(
+    /(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](\d{4})(?!\d)/
+  );
+  const shortDateMatch =
+    !fullDateMatch &&
+    workingText.match(/(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])(?!\d)/);
+
+  const isToday = /(?<!\p{L})сьогодні(?!\p{L})/iu.test(workingText);
+  const isTomorrow = /(?<!\p{L})завтра(?!\p{L})/iu.test(workingText);
+  const isDayAfter = /(?<!\p{L})післязавтра(?!\p{L})/iu.test(workingText);
+
+  if (
+    hours === undefined &&
+    !fullDateMatch &&
+    !shortDateMatch &&
+    !isToday &&
+    !isTomorrow &&
+    !isDayAfter
+  ) {
+    return null;
   }
 
-  let title = text
-    .replace(timeMatch[0], '')
-    .replace(/\b(нагадай|нагадати|\/remind|завтра|сьогодні|о|об)\b/gi, '')
-    .trim();
+  let targetYear, targetMonth, targetDay;
+
+  if (fullDateMatch) {
+    targetDay = parseInt(fullDateMatch[1], 10);
+    targetMonth = parseInt(fullDateMatch[2], 10);
+    targetYear = parseInt(fullDateMatch[3], 10);
+    workingText = workingText.replace(fullDateMatch[0], ' ');
+  } else if (shortDateMatch) {
+    targetDay = parseInt(shortDateMatch[1], 10);
+    targetMonth = parseInt(shortDateMatch[2], 10);
+    targetYear = now.year;
+    if (targetMonth < now.month || (targetMonth === now.month && targetDay < now.day)) {
+      targetYear += 1;
+    }
+    workingText = workingText.replace(shortDateMatch[0], ' ');
+  } else if (isDayAfter) {
+    const d = new Date(Date.UTC(now.year, now.month - 1, now.day + 2));
+    targetYear = d.getUTCFullYear();
+    targetMonth = d.getUTCMonth() + 1;
+    targetDay = d.getUTCDate();
+  } else if (isTomorrow) {
+    const d = new Date(Date.UTC(now.year, now.month - 1, now.day + 1));
+    targetYear = d.getUTCFullYear();
+    targetMonth = d.getUTCMonth() + 1;
+    targetDay = d.getUTCDate();
+  } else {
+    const d = new Date(Date.UTC(now.year, now.month - 1, now.day));
+    if (hours !== undefined) {
+      if (hours < now.hour || (hours === now.hour && minutes <= now.minute)) {
+        d.setUTCDate(d.getUTCDate() + 1);
+      }
+    }
+    targetYear = d.getUTCFullYear();
+    targetMonth = d.getUTCMonth() + 1;
+    targetDay = d.getUTCDate();
+  }
+
+  if (hours === undefined) {
+    hours = 10;
+    minutes = 0;
+  }
+
+  let title = workingText
+    .replace(/(?<!\p{L})(нагадай|нагадати|\/remind|завтра|післязавтра|сьогодні|о|об)(?!\p{L})/giu, '')
+    .trim()
+    .replace(/\s+/g, ' ');
 
   if (!title) title = 'Швидке нагадування';
 
+  const utcDate = kyivToUtc(targetYear, targetMonth, targetDay, hours, minutes);
+
   return {
     title,
-    remind_at: targetDate.toISOString(),
+    remind_at: utcDate.toISOString(),
   };
 }
 
@@ -162,7 +283,9 @@ async function handleQuickReminder(chatId, parsed, botToken, siteUrl) {
     minute: '2-digit',
     timeZone: 'Europe/Kyiv',
   });
-  const dateFormatted = new Date(parsed.remind_at).toLocaleDateString('uk-UA');
+  const dateFormatted = new Date(parsed.remind_at).toLocaleDateString('uk-UA', {
+    timeZone: 'Europe/Kyiv',
+  });
 
   const replyText =
     `✅ <b>Нагадування збережено!</b>\n\n` +
