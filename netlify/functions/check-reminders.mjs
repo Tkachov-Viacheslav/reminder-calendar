@@ -90,7 +90,3 @@ export default async () => {
     headers: { 'Content-Type': 'application/json' },
   });
 };
-
-export const config = {
-  schedule: '@hourly',
-};

@@ -1,13 +1,21 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useTelegram } from './TelegramContext';
-import { LOCAL_STORAGE_KEY } from '../utils/constants';
+import { LOCAL_STORAGE_KEY, LOCAL_STORAGE_CUSTOM_CATEGORIES } from '../utils/constants';
 
 const ReminderContext = createContext(null);
 
 export function ReminderProvider({ children }) {
   const { activeUserId, triggerHaptic } = useTelegram();
   const [reminders, setReminders] = useState([]);
+  const [customCategories, setCustomCategories] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_CATEGORIES);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewDate, setViewDate] = useState(new Date());
@@ -18,7 +26,6 @@ export function ReminderProvider({ children }) {
       if (data) {
         setReminders(JSON.parse(data));
       } else {
-        // Sample starter reminder
         const initialDate = new Date();
         initialDate.setHours(initialDate.getHours() + 1, 0, 0, 0);
         const starter = [{
@@ -41,6 +48,35 @@ export function ReminderProvider({ children }) {
     }
   }, [activeUserId]);
 
+  const fetchCategories = useCallback(async (remList) => {
+    let serverCats = [];
+    if (isSupabaseConfigured() && supabase && activeUserId) {
+      try {
+        const { data: catRows } = await supabase
+          .from('user_categories')
+          .select('name')
+          .eq('user_id', activeUserId);
+        if (catRows) {
+          serverCats = catRows.map((r) => r.name);
+        }
+      } catch (e) {
+        console.error('Failed to fetch user categories', e);
+      }
+    }
+
+    const fromReminders = (remList || [])
+      .map((r) => r.category)
+      .filter((c) => c && c !== 'main' && c !== 'other' && c !== 'personal' && c !== 'work');
+
+    const merged = Array.from(new Set([...serverCats, ...fromReminders]));
+    if (merged.length > 0) {
+      setCustomCategories(merged);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(merged));
+      } catch {}
+    }
+  }, [activeUserId]);
+
   const fetchReminders = useCallback(async () => {
     setLoading(true);
     if (!isSupabaseConfigured() || !supabase) {
@@ -55,14 +91,16 @@ export function ReminderProvider({ children }) {
       }
       const { data, error } = await query;
       if (error) throw error;
-      setReminders(data || []);
+      const list = data || [];
+      setReminders(list);
+      fetchCategories(list);
     } catch (err) {
       console.error('Supabase fetch error, fallback to local', err);
       loadLocalReminders();
     } finally {
       setLoading(false);
     }
-  }, [activeUserId, loadLocalReminders]);
+  }, [activeUserId, loadLocalReminders, fetchCategories]);
 
   useEffect(() => {
     fetchReminders();
@@ -135,10 +173,57 @@ export function ReminderProvider({ children }) {
     });
   };
 
+  const addCustomCategory = async (name) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed || customCategories.includes(trimmed)) return;
+
+    setCustomCategories((prev) => {
+      const updated = [...prev, trimmed];
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (isSupabaseConfigured() && supabase && activeUserId) {
+      try {
+        await supabase.from('user_categories').insert({
+          user_id: activeUserId,
+          name: trimmed,
+        });
+      } catch (e) {
+        console.error('Error inserting category into Supabase', e);
+      }
+    }
+  };
+
+  const deleteCustomCategory = async (name) => {
+    setCustomCategories((prev) => {
+      const updated = prev.filter((c) => c !== name);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    if (isSupabaseConfigured() && supabase && activeUserId) {
+      try {
+        await supabase
+          .from('user_categories')
+          .delete()
+          .eq('user_id', activeUserId)
+          .eq('name', name);
+      } catch (e) {
+        console.error('Error deleting category from Supabase', e);
+      }
+    }
+  };
+
   return (
     <ReminderContext.Provider
       value={{
         reminders,
+        customCategories,
         loading,
         selectedDate,
         setSelectedDate,
@@ -147,6 +232,8 @@ export function ReminderProvider({ children }) {
         addReminder,
         updateReminder,
         deleteReminder,
+        addCustomCategory,
+        deleteCustomCategory,
         refreshReminders: fetchReminders,
       }}
     >

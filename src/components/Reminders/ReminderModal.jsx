@@ -8,9 +8,11 @@ import {
 } from '../../utils/constants';
 import { toISODateString } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
+import { useReminders } from '../../context/ReminderContext';
 
 export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingReminder }) {
   const { triggerHaptic } = useTelegram();
+  const { customCategories, addCustomCategory, deleteCustomCategory } = useReminders();
 
   const getDefaultTime = () => {
     const d = new Date();
@@ -27,18 +29,10 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
 
-  const [customCategories, setCustomCategories] = useState(() => {
-    try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_CATEGORIES);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
 
-  const handleAddCustomCategory = (e) => {
+  const handleAddCustomCategory = async (e) => {
     e.preventDefault();
     const trimmed = newCatInput.trim();
     if (!trimmed) return;
@@ -54,26 +48,16 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setNewCatInput('');
       return;
     }
-    if (!customCategories.includes(trimmed)) {
-      const updated = [...customCategories, trimmed];
-      setCustomCategories(updated);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
-      } catch (err) {}
-    }
+    await addCustomCategory(trimmed);
     setCategory(trimmed);
     setNewCatInput('');
     setIsAddingCategory(false);
     triggerHaptic('light');
   };
 
-  const handleDeleteCustomCategory = (e, catToDelete) => {
+  const handleDeleteCustomCategory = async (e, catToDelete) => {
     e.stopPropagation();
-    const updated = customCategories.filter((c) => c !== catToDelete);
-    setCustomCategories(updated);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
-    } catch (err) {}
+    await deleteCustomCategory(catToDelete);
     if (category === catToDelete) {
       setCategory(DEFAULT_CATEGORY);
     }
