@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Bell, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
+import { Bell, Calendar as CalendarIcon } from 'lucide-react';
 import { ReminderCard } from './ReminderCard';
 import { formatDateUkrainian, isSameDay } from '../../utils/dateUtils';
 import { useReminders } from '../../context/ReminderContext';
@@ -56,13 +56,6 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs">
               Створіть нагадування, і бот надішле його у ваш Telegram в зазначений час.
             </p>
-            <button
-              onClick={onOpenNewReminder}
-              className="mt-4 flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Додати подію</span>
-            </button>
           </div>
         ) : (
           currentList.map((rem) => (
@@ -76,17 +69,6 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
           ))
         )}
       </div>
-
-      {/* Footer Add Button */}
-      {currentList.length > 0 && (
-        <button
-          onClick={onOpenNewReminder}
-          className="w-full mt-auto pt-2 flex items-center justify-center gap-1.5 py-2.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-semibold border border-indigo-200 dark:border-indigo-800/60 transition-colors"
-        >
-          <Plus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          <span>Додати нагадування на цей день</span>
-        </button>
-      )}
     </div>
   );
 }

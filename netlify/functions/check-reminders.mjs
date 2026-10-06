@@ -1,5 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
+function formatCategoryTag(cat) {
+  if (!cat) return 'інше';
+  const raw = String(cat).trim().toLowerCase();
+  if (raw === 'main' || raw === 'головне') return 'головне';
+  if (raw === 'other' || raw === 'інше') return 'інше';
+  if (raw === 'personal' || raw === 'особисте') return 'особисте';
+  if (raw === 'work' || raw === 'робота') return 'робота';
+  if (raw === 'study' || raw === 'навчання') return 'навчання';
+  if (raw === 'health' || raw === 'здоров’я' || raw === 'здоровя') return 'здоровя';
+
+  const clean = raw.replace(/\s+/g, '_').replace(/[^\p{L}\p{N}_]/gu, '');
+  return clean || 'інше';
+}
+
 async function sendTelegramAlert(botToken, chatId, reminder) {
   const timeFormatted = new Date(reminder.remind_at).toLocaleTimeString('uk-UA', {
     hour: '2-digit',
@@ -7,13 +21,15 @@ async function sendTelegramAlert(botToken, chatId, reminder) {
     timeZone: 'Europe/Kyiv',
   });
 
+  const categoryTag = formatCategoryTag(reminder.category);
+
   const message = [
     `🔔 <b>Нагадування!</b>`,
     ``,
     `📌 <b>${reminder.title}</b>`,
     reminder.description ? `📝 ${reminder.description}` : '',
     `⏰ Час: <b>${timeFormatted}</b>`,
-    `🏷 Категорія: #${reminder.category || 'інше'}`,
+    `🏷 Категорія: #${categoryTag}`,
   ].filter(Boolean).join('\n');
 
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;

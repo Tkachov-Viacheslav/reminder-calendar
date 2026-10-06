@@ -1,6 +1,6 @@
 import React from 'react';
 import { WEEKDAY_NAMES_UA, getMonthMatrix, isSameDay, isToday } from '../../utils/dateUtils';
-import { CATEGORIES } from '../../utils/constants';
+import { getCategoryMeta } from '../../utils/constants';
 import { useTelegram } from '../../context/TelegramContext';
 
 export function MonthView({ viewDate, selectedDate, onSelectDate, reminders }) {
@@ -73,7 +73,7 @@ export function MonthView({ viewDate, selectedDate, onSelectDate, reminders }) {
               {/* Reminders dots indicator */}
               <div className="w-full flex items-center justify-center gap-1 mt-1 overflow-hidden px-1">
                 {dayReminders.slice(0, 3).map((r, i) => {
-                  const category = CATEGORIES[r.category] || CATEGORIES.other;
+                  const category = getCategoryMeta(r.category);
                   return (
                     <span
                       key={r.id || i}

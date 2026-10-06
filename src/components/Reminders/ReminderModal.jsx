@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Tag, FileText, Check, Pencil } from 'lucide-react';
-import { CATEGORIES, DEFAULT_CATEGORY } from '../../utils/constants';
+import { X, Calendar, Clock, Tag, FileText, Check, Pencil, Plus } from 'lucide-react';
+import {
+  SYSTEM_CATEGORIES,
+  DEFAULT_CATEGORY,
+  getCategoryMeta,
+  LOCAL_STORAGE_CUSTOM_CATEGORIES,
+} from '../../utils/constants';
 import { toISODateString } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 
@@ -21,6 +26,59 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+
+  const [customCategories, setCustomCategories] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_CATEGORIES);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCatInput, setNewCatInput] = useState('');
+
+  const handleAddCustomCategory = (e) => {
+    e.preventDefault();
+    const trimmed = newCatInput.trim();
+    if (!trimmed) return;
+    if (trimmed.toLowerCase() === 'головне' || trimmed.toLowerCase() === 'main') {
+      setCategory('main');
+      setIsAddingCategory(false);
+      setNewCatInput('');
+      return;
+    }
+    if (trimmed.toLowerCase() === 'інше' || trimmed.toLowerCase() === 'other') {
+      setCategory('other');
+      setIsAddingCategory(false);
+      setNewCatInput('');
+      return;
+    }
+    if (!customCategories.includes(trimmed)) {
+      const updated = [...customCategories, trimmed];
+      setCustomCategories(updated);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+      } catch (err) {}
+    }
+    setCategory(trimmed);
+    setNewCatInput('');
+    setIsAddingCategory(false);
+    triggerHaptic('light');
+  };
+
+  const handleDeleteCustomCategory = (e, catToDelete) => {
+    e.stopPropagation();
+    const updated = customCategories.filter((c) => c !== catToDelete);
+    setCustomCategories(updated);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+    } catch (err) {}
+    if (category === catToDelete) {
+      setCategory(DEFAULT_CATEGORY);
+    }
+    triggerHaptic('light');
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -156,8 +214,9 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               Категорія
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.values(CATEGORIES).map((cat) => {
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* System Categories: Головне & Інше */}
+              {Object.values(SYSTEM_CATEGORIES).map((cat) => {
                 const isSelected = category === cat.id;
                 return (
                   <button
@@ -177,6 +236,85 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
                   </button>
                 );
               })}
+
+              {/* Custom Categories */}
+              {customCategories.map((catName) => {
+                const meta = getCategoryMeta(catName);
+                const isSelected = category === catName;
+                return (
+                  <div
+                    key={catName}
+                    onClick={() => {
+                      triggerHaptic('light');
+                      setCategory(catName);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className={`flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-medium border cursor-pointer transition-all ${
+                      isSelected
+                        ? `${meta.color} font-bold ring-2 ring-indigo-500/40 shadow-sm`
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <span>{catName}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteCustomCategory(e, catName)}
+                      className="text-slate-400 hover:text-rose-500 p-0.5 rounded transition-colors"
+                      title="Видалити категорію"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Add Custom Category Button or Input */}
+              {isAddingCategory ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Назва..."
+                    maxLength={20}
+                    value={newCatInput}
+                    onChange={(e) => setNewCatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddCustomCategory(e);
+                      if (e.key === 'Escape') setIsAddingCategory(false);
+                    }}
+                    className="px-2 py-0.5 text-xs bg-slate-50 dark:bg-slate-800 border border-indigo-400 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none w-24"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomCategory}
+                    className="p-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
+                    title="Зберегти категорію"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddingCategory(false);
+                      setNewCatInput('');
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                    title="Скасувати"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAddingCategory(true)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-dashed border-indigo-300 dark:border-indigo-700/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Категорія</span>
+                </button>
+              )}
             </div>
           </div>
 

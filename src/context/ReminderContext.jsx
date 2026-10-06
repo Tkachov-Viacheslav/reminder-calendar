@@ -27,7 +27,7 @@ export function ReminderProvider({ children }) {
           title: 'Ласкаво просимо до Календаря!',
           description: 'Підключіть Telegram бот для отримання нагадувань.',
           remind_at: initialDate.toISOString(),
-          category: 'personal',
+          category: 'main',
           is_sent: false,
           created_at: new Date().toISOString()
         }];

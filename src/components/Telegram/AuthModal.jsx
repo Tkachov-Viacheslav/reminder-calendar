@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, KeyRound, ExternalLink, Send, LogOut, CheckCircle2, AlertCircle, Bot, User } from 'lucide-react';
+import { X, KeyRound, ExternalLink, LogOut, Bot, User } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'bot';
@@ -9,7 +9,6 @@ export function AuthModal({ isOpen, onClose }) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [testStatus, setTestStatus] = useState({ loading: false, msg: '', success: null });
 
   if (!isOpen) return null;
 
@@ -30,33 +29,6 @@ export function AuthModal({ isOpen, onClose }) {
       onClose();
     } else {
       setError(res.error || 'Невірний або прострочений код');
-    }
-  };
-
-  const handleSendTest = async () => {
-    if (!user?.id) return;
-    setTestStatus({ loading: true, msg: 'Надсилаємо тест...', success: null });
-    triggerHaptic('light');
-
-    try {
-      const response = await fetch('/api/send-test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          message: '🔔 Привіт! Ваш акаунт успішно авторизовано на сайті Календаря.',
-        }),
-      });
-      const data = await response.json();
-      if (response.ok && (data.ok || data.result)) {
-        setTestStatus({ loading: false, msg: 'Тестове сповіщення надійшло у ваш Telegram!', success: true });
-        triggerHaptic('success');
-      } else {
-        setTestStatus({ loading: false, msg: data.error || 'Помилка надсилання.', success: false });
-        triggerHaptic('error');
-      }
-    } catch {
-      setTestStatus({ loading: false, msg: 'Помилка мережі при надсиланні', success: false });
     }
   };
 
@@ -101,25 +73,6 @@ export function AuthModal({ isOpen, onClose }) {
                   Авторизовано
                 </span>
               </div>
-
-              {/* Test Notification */}
-              <button
-                onClick={handleSendTest}
-                disabled={testStatus.loading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>{testStatus.loading ? 'Надсилаємо...' : 'Надіслати тестовий пінг у Telegram'}</span>
-              </button>
-
-              {testStatus.msg && (
-                <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
-                  testStatus.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
-                }`}>
-                  {testStatus.success ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />}
-                  <span>{testStatus.msg}</span>
-                </div>
-              )}
 
               {/* Logout button */}
               {!isInTelegram && (

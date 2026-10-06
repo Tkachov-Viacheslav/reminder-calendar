@@ -1,12 +1,12 @@
 import React from 'react';
 import { Clock, CheckCircle2, Trash2, BellRing, AlertCircle, Pencil } from 'lucide-react';
-import { CATEGORIES } from '../../utils/constants';
+import { getCategoryMeta } from '../../utils/constants';
 import { formatTime } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 
 export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit }) {
   const { triggerHaptic } = useTelegram();
-  const category = CATEGORIES[reminder.category] || CATEGORIES.other;
+  const category = getCategoryMeta(reminder.category);
   const isPast = new Date(reminder.remind_at) < new Date();
 
   const handleEdit = (e) => {
