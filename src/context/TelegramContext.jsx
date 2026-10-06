@@ -15,13 +15,17 @@ export function TelegramProvider({ children }) {
   });
 
   const triggerHaptic = (type = 'light') => {
-    const tg = window?.Telegram?.WebApp;
-    if (tg?.HapticFeedback) {
-      if (type === 'success' || type === 'error' || type === 'warning') {
-        tg.HapticFeedback.notificationOccurred(type);
-      } else {
-        tg.HapticFeedback.impactOccurred(type);
+    try {
+      const tg = window?.Telegram?.WebApp;
+      if (tg?.isVersionAtLeast?.('6.1') && tg?.HapticFeedback) {
+        if (type === 'success' || type === 'error' || type === 'warning') {
+          tg.HapticFeedback.notificationOccurred(type);
+        } else {
+          tg.HapticFeedback.impactOccurred(type);
+        }
       }
+    } catch {
+      // Haptic feedback not supported on this device/version
     }
   };
 
