@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Tag, FileText, Check, Pencil, Plus } from 'lucide-react';
+import { X, Calendar, Clock, Tag, FileText, Check, Pencil, Plus, Bell, Repeat } from 'lucide-react';
 import {
   SYSTEM_CATEGORIES,
   DEFAULT_CATEGORY,
@@ -27,6 +27,8 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
   const [timeStr, setTimeStr] = useState(getDefaultTime);
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [description, setDescription] = useState('');
+  const [repeatType, setRepeatType] = useState('none');
+  const [remindBefore, setRemindBefore] = useState(0);
   const [error, setError] = useState('');
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -70,7 +72,13 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setTitle(editingReminder.title || '');
       setDescription(editingReminder.description || '');
       setCategory(editingReminder.category || DEFAULT_CATEGORY);
+      setRepeatType(editingReminder.repeat_type || 'none');
+      const remindBeforeVal = editingReminder.remind_before || 0;
+      setRemindBefore(remindBeforeVal);
       const remDate = new Date(editingReminder.remind_at);
+      if (remindBeforeVal) {
+        remDate.setTime(remDate.getTime() + Number(remindBeforeVal) * 60 * 1000);
+      }
       setDateStr(toISODateString(remDate));
       const hh = String(remDate.getHours()).padStart(2, '0');
       const mm = String(remDate.getMinutes()).padStart(2, '0');
@@ -79,6 +87,8 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setTitle('');
       setDescription('');
       setCategory(DEFAULT_CATEGORY);
+      setRepeatType('none');
+      setRemindBefore(0);
       setDateStr(toISODateString(initialDate || new Date()));
       setTimeStr(getDefaultTime());
     }
@@ -97,14 +107,17 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
 
     const [year, month, day] = dateStr.split('-').map(Number);
     const [hours, minutes] = timeStr.split(':').map(Number);
-    const reminderDate = new Date(year, month - 1, day, hours, minutes);
+    const eventDate = new Date(year, month - 1, day, hours, minutes);
+    const remindAtDate = new Date(eventDate.getTime() - Number(remindBefore) * 60 * 1000);
 
     triggerHaptic('success');
     onSave({
       title: title.trim(),
       description: description.trim(),
       category,
-      remind_at: reminderDate.toISOString(),
+      remind_at: remindAtDate.toISOString(),
+      repeat_type: repeatType,
+      remind_before: Number(remindBefore),
       ...(editingReminder ? { is_sent: false } : {}),
     });
 
@@ -190,6 +203,44 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
                   className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Remind Before & Repeat */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <Bell className="w-3 h-3 text-indigo-500" />
+                <span>Попередження</span>
+              </label>
+              <select
+                value={remindBefore}
+                onChange={(e) => setRemindBefore(Number(e.target.value))}
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 cursor-pointer"
+              >
+                <option value={0}>Вчасно</option>
+                <option value={15}>За 15 хв</option>
+                <option value={30}>За 30 хв</option>
+                <option value={60}>За 1 год</option>
+                <option value={1440}>За 1 день</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                <Repeat className="w-3 h-3 text-indigo-500" />
+                <span>Повторення</span>
+              </label>
+              <select
+                value={repeatType}
+                onChange={(e) => setRepeatType(e.target.value)}
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 cursor-pointer"
+              >
+                <option value="none">Не повторювати</option>
+                <option value="daily">Щодня</option>
+                <option value="weekly">Щотижня</option>
+                <option value="monthly">Щомісяця</option>
+              </select>
             </div>
           </div>
 

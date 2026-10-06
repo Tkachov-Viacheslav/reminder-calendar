@@ -14,6 +14,20 @@ function formatCategoryTag(cat) {
   return clean || 'інше';
 }
 
+function getNextRepeatDate(currentIso, repeatType) {
+  const date = new Date(currentIso);
+  if (repeatType === 'daily') {
+    date.setDate(date.getDate() + 1);
+  } else if (repeatType === 'weekly') {
+    date.setDate(date.getDate() + 7);
+  } else if (repeatType === 'monthly') {
+    date.setMonth(date.getMonth() + 1);
+  } else {
+    return null;
+  }
+  return date.toISOString();
+}
+
 async function sendTelegramAlert(botToken, chatId, reminder) {
   const timeFormatted = new Date(reminder.remind_at).toLocaleTimeString('uk-UA', {
     hour: '2-digit',
@@ -22,13 +36,16 @@ async function sendTelegramAlert(botToken, chatId, reminder) {
   });
 
   const categoryTag = formatCategoryTag(reminder.category);
+  const repeatInfo = reminder.repeat_type && reminder.repeat_type !== 'none'
+    ? `\n🔁 Повторення: <b>${reminder.repeat_type === 'daily' ? 'щодня' : reminder.repeat_type === 'weekly' ? 'щотижня' : 'щомісяця'}</b>`
+    : '';
 
   const message = [
     `🔔 <b>Нагадування!</b>`,
     ``,
     `📌 <b>${reminder.title}</b>`,
     reminder.description ? `📝 ${reminder.description}` : '',
-    `⏰ Час: <b>${timeFormatted}</b>`,
+    `⏰ Час: <b>${timeFormatted}</b>${repeatInfo}`,
     `🏷 Категорія: #${categoryTag}`,
   ].filter(Boolean).join('\n');
 
@@ -40,13 +57,30 @@ async function sendTelegramAlert(botToken, chatId, reminder) {
       chat_id: chatId,
       text: message,
       parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Виконано', callback_data: `done_${reminder.id}` },
+            { text: '💤 Відкласти 15 хв', callback_data: `snooze_${reminder.id}` },
+          ],
+        ],
+      },
     }),
   });
 
   return response.ok;
 }
 
-export default async () => {
+export default async (req) => {
+  const secretHeader = req.headers.get('x-cron-secret');
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && secretHeader !== cronSecret) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -79,8 +113,16 @@ export default async () => {
     if (item.user_id && item.user_id !== 'guest') {
       const ok = await sendTelegramAlert(botToken, item.user_id, item);
       if (ok) {
-        await supabase.from('reminders').update({ is_sent: true }).eq('id', item.id);
         sentCount++;
+        const nextDate = getNextRepeatDate(item.remind_at, item.repeat_type);
+        if (nextDate) {
+          await supabase
+            .from('reminders')
+            .update({ remind_at: nextDate, is_sent: false })
+            .eq('id', item.id);
+        } else {
+          await supabase.from('reminders').update({ is_sent: true }).eq('id', item.id);
+        }
       }
     }
   }
