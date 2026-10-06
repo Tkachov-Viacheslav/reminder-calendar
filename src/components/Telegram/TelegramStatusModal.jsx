@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Send, CheckCircle2, AlertCircle, Bot, ExternalLink } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
 
-const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'reminderveter_bot';
+const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'bot';
 
 export function TelegramStatusModal({ isOpen, onClose }) {
   const { isInTelegram, tgUser, manualChatId, saveManualChatId, activeUserId, triggerHaptic } = useTelegram();

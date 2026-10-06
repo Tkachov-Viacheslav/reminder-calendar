@@ -32,7 +32,7 @@
 2. Вкажіть назву та username (наприклад, `my_calendar_bot`).
 3. Збережіть отриманий токен (наприклад, `7123456789:AAFxxx...`).
 4. *(Опціонально для Mini App)* Налаштуйте кнопку меню:
-   - Надішліть `/setmenubutton` → оберіть `@reminderveter_bot` → вкажіть URL сайту: `https://reminder-calendar-tg.netlify.app`.
+   - Надішліть `/setmenubutton` → оберіть вашого бота → вкажіть URL сайту: `https://reminder-calendar-tg.netlify.app`.
 
 ---
 
