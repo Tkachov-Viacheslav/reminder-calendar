@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TelegramProvider, useTelegram } from './context/TelegramContext';
+import { TelegramProvider } from './context/TelegramContext';
 import { ReminderProvider, useReminders } from './context/ReminderContext';
 import { Header } from './components/Header';
 import { CalendarHeader } from './components/Calendar/CalendarHeader';
@@ -7,15 +7,13 @@ import { MonthView } from './components/Calendar/MonthView';
 import { ReminderList } from './components/Reminders/ReminderList';
 import { ReminderModal } from './components/Reminders/ReminderModal';
 import { TelegramStatusModal } from './components/Telegram/TelegramStatusModal';
-import { SetupModal } from './components/SetupGuide/SetupModal';
 import { isSupabaseConfigured } from './services/supabase';
-import { Info, Sparkles } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 function CalendarContent() {
   const { viewDate, setViewDate, selectedDate, setSelectedDate, reminders, addReminder } = useReminders();
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const handlePrevMonth = () => {
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
@@ -37,7 +35,6 @@ function CalendarContent() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
       <Header
         onOpenNewReminder={() => setIsReminderModalOpen(true)}
-        onOpenGuide={() => setIsGuideOpen(true)}
         onOpenTelegramSettings={() => setIsTelegramModalOpen(true)}
       />
 
@@ -49,15 +46,9 @@ function CalendarContent() {
             <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
               <Info className="w-4 h-4 text-indigo-500 shrink-0" />
               <span>
-                <strong>Локальний демо-режим:</strong> Події зберігаються у браузері. Підключіть Supabase для автоматичних TG-нагадувань за розкладом.
+                <strong>Локальний демо-режим:</strong> Події зберігаються у браузері.
               </span>
             </div>
-            <button
-              onClick={() => setIsGuideOpen(true)}
-              className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold shrink-0 ml-2"
-            >
-              Інструкція
-            </button>
           </div>
         )}
 
@@ -98,10 +89,6 @@ function CalendarContent() {
       <TelegramStatusModal
         isOpen={isTelegramModalOpen}
         onClose={() => setIsTelegramModalOpen(false)}
-      />
-      <SetupModal
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
       />
     </div>
   );

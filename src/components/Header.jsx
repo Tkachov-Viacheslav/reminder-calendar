@@ -1,9 +1,9 @@
 import React from 'react';
-import { Calendar as CalendarIcon, Send, HelpCircle, Plus, Database, Sparkles } from 'lucide-react';
+import { Calendar as CalendarIcon, Send, Plus } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { isSupabaseConfigured } from '../services/supabase';
 
-export function Header({ onOpenNewReminder, onOpenGuide, onOpenTelegramSettings }) {
+export function Header({ onOpenNewReminder, onOpenTelegramSettings }) {
   const { isInTelegram, tgUser, activeUserId } = useTelegram();
   const dbConfigured = isSupabaseConfigured();
 
@@ -42,16 +42,6 @@ export function Header({ onOpenNewReminder, onOpenGuide, onOpenTelegramSettings 
                 ? `ID: ${activeUserId.slice(0, 6)}...`
                 : 'Підключити TG'}
             </span>
-          </button>
-
-          {/* Guide button */}
-          <button
-            onClick={onOpenGuide}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-            title="Інструкція з налаштування"
-            aria-label="Інструкція"
-          >
-            <HelpCircle className="w-5 h-5" />
           </button>
 
           {/* Quick add button */}
