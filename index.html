@@ -7,11 +7,32 @@
     <meta name="description" content="Сучасний календар з нагадуваннями та інтеграцією з Telegram ботом" />
     <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      try {
+        localStorage.setItem('nl-hud:public:v1', 'hidden');
+        localStorage.setItem('nl-hud:owner-private:v1', 'hidden');
+      } catch (e) {}
+    </script>
+    <style>
+      #nl-badge-frame,
+      #nl-hud-frame,
+      iframe[title*="Netlify"],
+      iframe[title*="Powered by Netlify"],
+      iframe[id*="nl-"] {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen antialiased selection:bg-indigo-500 selection:text-white">
+    <!-- Trap Netlify HUD early-exit check -->
+    <div id="nl-badge-frame" style="display:none!important"></div>
+    <div id="nl-hud-frame" style="display:none!important"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

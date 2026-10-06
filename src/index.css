@@ -26,3 +26,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.7);
 }
+
+/* Block Netlify badge & HUD */
+#nl-badge-frame,
+#nl-hud-frame,
+iframe[title*="Netlify"],
+iframe[title*="Powered by Netlify"],
+iframe[id*="nl-"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
