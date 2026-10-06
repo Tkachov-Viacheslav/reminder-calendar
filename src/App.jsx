@@ -6,14 +6,14 @@ import { CalendarHeader } from './components/Calendar/CalendarHeader';
 import { MonthView } from './components/Calendar/MonthView';
 import { ReminderList } from './components/Reminders/ReminderList';
 import { ReminderModal } from './components/Reminders/ReminderModal';
-import { TelegramStatusModal } from './components/Telegram/TelegramStatusModal';
+import { AuthModal } from './components/Telegram/AuthModal';
 import { isSupabaseConfigured } from './services/supabase';
 import { Info } from 'lucide-react';
 
 function CalendarContent() {
   const { viewDate, setViewDate, selectedDate, setSelectedDate, reminders, addReminder } = useReminders();
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
-  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const handlePrevMonth = () => {
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
@@ -35,7 +35,7 @@ function CalendarContent() {
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
       <Header
         onOpenNewReminder={() => setIsReminderModalOpen(true)}
-        onOpenTelegramSettings={() => setIsTelegramModalOpen(true)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       {/* Main Container */}
@@ -86,9 +86,9 @@ function CalendarContent() {
         onSave={addReminder}
         initialDate={selectedDate}
       />
-      <TelegramStatusModal
-        isOpen={isTelegramModalOpen}
-        onClose={() => setIsTelegramModalOpen(false)}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
       />
     </div>
   );

@@ -39,4 +39,5 @@ export const CATEGORIES = {
 export const DEFAULT_CATEGORY = 'personal';
 
 export const LOCAL_STORAGE_KEY = 'reminder_calendar_events_v1';
+export const LOCAL_STORAGE_USER = 'reminder_auth_user_v1';
 export const LOCAL_STORAGE_CHAT_ID = 'reminder_telegram_chat_id';

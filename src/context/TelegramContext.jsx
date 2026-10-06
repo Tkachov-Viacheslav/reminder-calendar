@@ -1,37 +1,18 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { LOCAL_STORAGE_CHAT_ID } from '../utils/constants';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { LOCAL_STORAGE_USER } from '../utils/constants';
 
 const TelegramContext = createContext(null);
 
 export function TelegramProvider({ children }) {
   const [isInTelegram, setIsInTelegram] = useState(false);
-  const [tgUser, setTgUser] = useState(null);
-  const [manualChatId, setManualChatId] = useState(() => {
-    return localStorage.getItem(LOCAL_STORAGE_CHAT_ID) || '';
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_STORAGE_USER);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
   });
-
-  useEffect(() => {
-    const tg = window?.Telegram?.WebApp;
-    if (tg && tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) {
-      setIsInTelegram(true);
-      tg.ready();
-      tg.expand();
-
-      if (tg.initDataUnsafe.user) {
-        setTgUser(tg.initDataUnsafe.user);
-      }
-    }
-  }, []);
-
-  const saveManualChatId = (id) => {
-    const cleanId = String(id).trim();
-    setManualChatId(cleanId);
-    if (cleanId) {
-      localStorage.setItem(LOCAL_STORAGE_CHAT_ID, cleanId);
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_CHAT_ID);
-    }
-  };
 
   const triggerHaptic = (type = 'light') => {
     const tg = window?.Telegram?.WebApp;
@@ -44,16 +25,72 @@ export function TelegramProvider({ children }) {
     }
   };
 
-  const activeUserId = tgUser?.id ? String(tgUser.id) : manualChatId;
+  const loginWithCode = useCallback(async (code) => {
+    triggerHaptic('light');
+    try {
+      const res = await fetch('/api/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: String(code).trim() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok && data.user) {
+        setUser(data.user);
+        localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(data.user));
+        triggerHaptic('success');
+        return { success: true, user: data.user };
+      }
+      triggerHaptic('error');
+      return { success: false, error: data.error || 'Невірний код' };
+    } catch (err) {
+      triggerHaptic('error');
+      return { success: false, error: 'Помилка мережі при перевірці коду' };
+    }
+  }, []);
+
+  const logout = () => {
+    triggerHaptic('medium');
+    setUser(null);
+    localStorage.removeItem(LOCAL_STORAGE_USER);
+  };
+
+  useEffect(() => {
+    // 1. Check if running inside Telegram Mini App
+    const tg = window?.Telegram?.WebApp;
+    if (tg?.initDataUnsafe?.user) {
+      setIsInTelegram(true);
+      tg.ready();
+      tg.expand();
+      const tgU = tg.initDataUnsafe.user;
+      const tmaUser = { id: String(tgU.id), first_name: tgU.first_name, username: tgU.username };
+      setUser(tmaUser);
+      localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(tmaUser));
+      return;
+    }
+
+    // 2. Check 1-click magic link: ?auth=123456
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get('auth');
+    if (authCode) {
+      loginWithCode(authCode).then((res) => {
+        if (res.success) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      });
+    }
+  }, [loginWithCode]);
+
+  const activeUserId = user?.id ? String(user.id) : null;
 
   return (
     <TelegramContext.Provider
       value={{
         isInTelegram,
-        tgUser,
-        manualChatId,
-        saveManualChatId,
+        user,
+        isAuthenticated: Boolean(activeUserId),
         activeUserId,
+        loginWithCode,
+        logout,
         triggerHaptic,
       }}
     >
