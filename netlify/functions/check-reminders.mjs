@@ -1,11 +1,10 @@
-import { schedule } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 
 async function sendTelegramAlert(botToken, chatId, reminder) {
   const timeFormatted = new Date(reminder.remind_at).toLocaleTimeString('uk-UA', {
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Europe/Kyiv'
+    timeZone: 'Europe/Kyiv',
   });
 
   const message = [
@@ -14,7 +13,7 @@ async function sendTelegramAlert(botToken, chatId, reminder) {
     `📌 <b>${reminder.title}</b>`,
     reminder.description ? `📝 ${reminder.description}` : '',
     `⏰ Час: <b>${timeFormatted}</b>`,
-    `🏷 Категорія: #${reminder.category || 'інше'}`
+    `🏷 Категорія: #${reminder.category || 'інше'}`,
   ].filter(Boolean).join('\n');
 
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -24,20 +23,19 @@ async function sendTelegramAlert(botToken, chatId, reminder) {
     body: JSON.stringify({
       chat_id: chatId,
       text: message,
-      parse_mode: 'HTML'
-    })
+      parse_mode: 'HTML',
+    }),
   });
 
   return response.ok;
 }
 
-const handler = async () => {
+export default async () => {
   const supabaseUrl = process.env.VITE_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!supabaseUrl || !supabaseKey || !botToken) {
-    console.log('Skipping scheduled check: missing credentials');
     return new Response(JSON.stringify({ message: 'Missing env vars' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -77,5 +75,6 @@ const handler = async () => {
   });
 };
 
-// Runs every minute in Netlify Scheduled Functions
-export default schedule('* * * * *', handler);
+export const config = {
+  schedule: '@hourly',
+};
