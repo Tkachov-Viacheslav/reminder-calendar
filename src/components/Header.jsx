@@ -16,15 +16,9 @@ export function Header({ onOpenNewReminder, onOpenGuide, onOpenTelegramSettings 
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-base sm:text-lg leading-tight flex items-center gap-1.5">
+            <h1 className="font-bold text-base sm:text-lg leading-tight">
               Календар
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400">
-                Bot Sync
-              </span>
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">
-              Нагадування прямо у твій Telegram
-            </p>
           </div>
         </div>
 
