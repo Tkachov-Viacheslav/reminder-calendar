@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       {
         name: 'local-api-handler',
+        apply: 'serve',
         configureServer(server) {
           server.middlewares.use((req, res, next) => {
             if (req.url === '/api/send-test' && req.method === 'POST') {
