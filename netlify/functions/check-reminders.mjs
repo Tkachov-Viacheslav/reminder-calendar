@@ -38,7 +38,10 @@ const handler = async () => {
 
   if (!supabaseUrl || !supabaseKey || !botToken) {
     console.log('Skipping scheduled check: missing credentials');
-    return { statusCode: 200, body: JSON.stringify({ message: 'Missing env vars' }) };
+    return new Response(JSON.stringify({ message: 'Missing env vars' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -51,7 +54,10 @@ const handler = async () => {
     .lte('remind_at', now);
 
   if (error || !reminders || reminders.length === 0) {
-    return { statusCode: 200, body: JSON.stringify({ processed: 0 }) };
+    return new Response(JSON.stringify({ processed: 0 }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   let sentCount = 0;
@@ -65,7 +71,10 @@ const handler = async () => {
     }
   }
 
-  return { statusCode: 200, body: JSON.stringify({ processed: sentCount }) };
+  return new Response(JSON.stringify({ processed: sentCount }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 };
 
 // Runs every minute in Netlify Scheduled Functions
