@@ -4,7 +4,7 @@ import { ReminderCard } from './ReminderCard';
 import { formatDateUkrainian, isSameDay } from '../../utils/dateUtils';
 import { useReminders } from '../../context/ReminderContext';
 
-export function ReminderList({ onOpenNewReminder }) {
+export function ReminderList({ onOpenNewReminder, onEditReminder }) {
   const { reminders, selectedDate, updateReminder, deleteReminder } = useReminders();
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
@@ -71,6 +71,7 @@ export function ReminderList({ onOpenNewReminder }) {
               reminder={rem}
               onToggleSent={handleToggleSent}
               onDelete={deleteReminder}
+              onEdit={onEditReminder}
             />
           ))
         )}

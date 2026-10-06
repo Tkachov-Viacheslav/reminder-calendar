@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { X, Calendar, Clock, Tag, FileText, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Clock, Tag, FileText, Check, Pencil } from 'lucide-react';
 import { CATEGORIES, DEFAULT_CATEGORY } from '../../utils/constants';
 import { toISODateString } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 
-export function ReminderModal({ isOpen, onClose, onSave, initialDate }) {
+export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingReminder }) {
   const { triggerHaptic } = useTelegram();
 
   const getDefaultTime = () => {
@@ -21,6 +21,27 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate }) {
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [description, setDescription] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingReminder) {
+      setTitle(editingReminder.title || '');
+      setDescription(editingReminder.description || '');
+      setCategory(editingReminder.category || DEFAULT_CATEGORY);
+      const remDate = new Date(editingReminder.remind_at);
+      setDateStr(toISODateString(remDate));
+      const hh = String(remDate.getHours()).padStart(2, '0');
+      const mm = String(remDate.getMinutes()).padStart(2, '0');
+      setTimeStr(`${hh}:${mm}`);
+    } else {
+      setTitle('');
+      setDescription('');
+      setCategory(DEFAULT_CATEGORY);
+      setDateStr(toISODateString(initialDate || new Date()));
+      setTimeStr(getDefaultTime());
+    }
+    setError('');
+  }, [isOpen, editingReminder, initialDate]);
 
   if (!isOpen) return null;
 
@@ -42,12 +63,9 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate }) {
       description: description.trim(),
       category,
       remind_at: reminderDate.toISOString(),
+      ...(editingReminder ? { is_sent: false } : {}),
     });
 
-    // Reset form
-    setTitle('');
-    setDescription('');
-    setError('');
     onClose();
   };
 
@@ -57,7 +75,14 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate }) {
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <span>Нове нагадування</span>
+            {editingReminder ? (
+              <>
+                <Pencil className="w-4 h-4 text-indigo-500" />
+                <span>Редагувати подію</span>
+              </>
+            ) : (
+              <span>Нове нагадування</span>
+            )}
           </h3>
           <button
             onClick={onClose}
@@ -183,7 +208,7 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate }) {
               className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-95"
             >
               <Check className="w-4 h-4" />
-              <span>Зберегти нагадування</span>
+              <span>{editingReminder ? 'Зберегти зміни' : 'Зберегти нагадування'}</span>
             </button>
           </div>
         </form>

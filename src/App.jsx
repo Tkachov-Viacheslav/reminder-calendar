@@ -11,9 +11,42 @@ import { isSupabaseConfigured } from './services/supabase';
 import { Info } from 'lucide-react';
 
 function CalendarContent() {
-  const { viewDate, setViewDate, selectedDate, setSelectedDate, reminders, addReminder } = useReminders();
+  const {
+    viewDate,
+    setViewDate,
+    selectedDate,
+    setSelectedDate,
+    reminders,
+    addReminder,
+    updateReminder,
+  } = useReminders();
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [editingReminder, setEditingReminder] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleOpenNewReminder = () => {
+    setEditingReminder(null);
+    setIsReminderModalOpen(true);
+  };
+
+  const handleEditReminder = (reminder) => {
+    setEditingReminder(reminder);
+    setIsReminderModalOpen(true);
+  };
+
+  const handleCloseReminderModal = () => {
+    setIsReminderModalOpen(false);
+    setEditingReminder(null);
+  };
+
+  const handleSaveReminder = async (data) => {
+    if (editingReminder) {
+      await updateReminder(editingReminder.id, data);
+    } else {
+      await addReminder(data);
+    }
+    setEditingReminder(null);
+  };
 
   const handlePrevMonth = () => {
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
@@ -34,7 +67,7 @@ function CalendarContent() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
       <Header
-        onOpenNewReminder={() => setIsReminderModalOpen(true)}
+        onOpenNewReminder={handleOpenNewReminder}
         onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
@@ -74,7 +107,10 @@ function CalendarContent() {
 
           {/* Reminders List Box */}
           <div className="lg:col-span-5 h-full">
-            <ReminderList onOpenNewReminder={() => setIsReminderModalOpen(true)} />
+            <ReminderList
+              onOpenNewReminder={handleOpenNewReminder}
+              onEditReminder={handleEditReminder}
+            />
           </div>
         </div>
       </main>
@@ -82,9 +118,10 @@ function CalendarContent() {
       {/* Modals */}
       <ReminderModal
         isOpen={isReminderModalOpen}
-        onClose={() => setIsReminderModalOpen(false)}
-        onSave={addReminder}
+        onClose={handleCloseReminderModal}
+        onSave={handleSaveReminder}
         initialDate={selectedDate}
+        editingReminder={editingReminder}
       />
       <AuthModal
         isOpen={isAuthModalOpen}

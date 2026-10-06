@@ -1,13 +1,19 @@
 import React from 'react';
-import { Clock, CheckCircle2, Trash2, BellRing, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle2, Trash2, BellRing, AlertCircle, Pencil } from 'lucide-react';
 import { CATEGORIES } from '../../utils/constants';
 import { formatTime } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 
-export function ReminderCard({ reminder, onToggleSent, onDelete }) {
+export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit }) {
   const { triggerHaptic } = useTelegram();
   const category = CATEGORIES[reminder.category] || CATEGORIES.other;
   const isPast = new Date(reminder.remind_at) < new Date();
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    triggerHaptic('light');
+    if (onEdit) onEdit(reminder);
+  };
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -37,14 +43,23 @@ export function ReminderCard({ reminder, onToggleSent, onDelete }) {
           </span>
         </div>
 
-        {/* Delete action */}
-        <button
-          onClick={handleDelete}
-          className="opacity-60 group-hover:opacity-100 text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
-          title="Видалити"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {/* Actions: Edit & Delete */}
+        <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={handleEdit}
+            className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md transition-colors"
+            title="Редагувати нотатку"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={handleDelete}
+            className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
+            title="Видалити"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Title & Description */}
