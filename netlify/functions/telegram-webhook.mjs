@@ -31,17 +31,32 @@ async function generateAndSaveCode(chatId, user) {
   return code;
 }
 
+async function sendBotMessage(botToken, chatId, text, siteUrl, extraRows = []) {
+  const keyboard = [
+    [{ text: '📅 Відкрити Календар (Mini App)', web_app: { url: siteUrl } }],
+    ...extraRows,
+  ];
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: keyboard },
+    }),
+  });
+}
+
 async function sendAuthCode(chatId, user, botToken, siteUrl) {
   const code = await generateAndSaveCode(chatId, user);
   if (!code) {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: '❌ Не вдалося створити код. Спробуйте ще раз через хвилину.',
-      }),
-    });
+    await sendBotMessage(
+      botToken,
+      chatId,
+      '❌ Не вдалося створити код. Спробуйте ще раз через хвилину.',
+      siteUrl
+    );
     return;
   }
 
@@ -49,22 +64,11 @@ async function sendAuthCode(chatId, user, botToken, siteUrl) {
     `🔐 <b>Ваш одноразовий код для входу:</b>\n\n` +
     `👉 <code>${code}</code> 👈\n\n` +
     `⏱ Дійсний 10 хвилин.\n` +
-    `Введіть його на сайті або натисніть кнопку нижче для входу в 1 клік:`;
+    `Введіть його на сайті або натисніть кнопку нижче:`;
 
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: replyText,
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🚀 Увійти на сайті в 1 клік', url: `${siteUrl}/?auth=${code}` }],
-        ],
-      },
-    }),
-  });
+  await sendBotMessage(botToken, chatId, replyText, siteUrl, [
+    [{ text: '🚀 Увійти на сайті в 1 клік', url: `${siteUrl}/?auth=${code}` }],
+  ]);
 }
 
 async function sendWelcome(chatId, user, botToken, siteUrl) {
@@ -72,27 +76,34 @@ async function sendWelcome(chatId, user, botToken, siteUrl) {
   const replyText =
     `👋 <b>Вітаю, ${name}!</b>\n\n` +
     `Я бот для нагадувань у Календарі.\n\n` +
-    `💡 <b>Швидке створення нагадування:</b>\n` +
-    `Напишіть мені повідомлення, наприклад:\n` +
-    `• <i>«Купити молоко о 19:00»</i>\n` +
-    `• <i>«Завтра о 14:30 дзвінок клієнту»</i>\n\n` +
-    `💻 <b>Вхід у браузері:</b> надішліть команду /code`;
+    `⚡ <b>Корисні команди:</b>\n` +
+    `• /today — розклад на сьогодні\n` +
+    `• /tomorrow — плани на завтра\n` +
+    `• /week — справи на 7 днів\n` +
+    `• /code — код для входу в браузері\n\n` +
+    `✍️ <b>Швидке створення:</b> напишіть мені в чат:\n` +
+    `• <i>«10.11 19:00 Сходити в ДНУ»</i>\n` +
+    `• <i>«Завтра о 14:30 дзвінок»</i>\n` +
+    `• <i>«Купити молоко о 20:00»</i>`;
 
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: replyText,
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '📅 Відкрити Календар (Mini App)', web_app: { url: siteUrl } }],
-          [{ text: '🔑 Отримати код для браузера', callback_data: 'get_code' }],
-        ],
-      },
-    }),
-  });
+  await sendBotMessage(botToken, chatId, replyText, siteUrl, [
+    [{ text: '🔑 Отримати код для браузера', callback_data: 'get_code' }],
+  ]);
+}
+
+async function sendHelp(chatId, botToken, siteUrl) {
+  const replyText =
+    `💡 <b>Довідка по командах:</b>\n\n` +
+    `📅 <b>/today</b> — переглянути всі справи на сьогодні\n` +
+    `🌅 <b>/tomorrow</b> — справи на завтра\n` +
+    `📆 <b>/week</b> — розклад на найближчі 7 днів\n` +
+    `🔑 <b>/code</b> — отримати одноразовий код авторизації для ПК\n\n` +
+    `⏰ <b>Створення:</b> просто пишіть текст із датою та часом:\n` +
+    `• <i>Сьогодні о 19:00 тренування</i>\n` +
+    `• <i>15.11 12:00 стоматолог</i>\n\n` +
+    `☀️ <b>Ранковий дайджест:</b> щоранку о 09:00 бот надсилає зведення завдань.`;
+
+  await sendBotMessage(botToken, chatId, replyText, siteUrl);
 }
 
 async function answerCallbackQuery(botToken, queryId, text) {
@@ -100,10 +111,7 @@ async function answerCallbackQuery(botToken, queryId, text) {
     await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        callback_query_id: queryId,
-        text: text || '',
-      }),
+      body: JSON.stringify({ callback_query_id: queryId, text: text || '' }),
     });
   } catch (err) {
     console.error('Failed to answer callback query:', err);
@@ -161,11 +169,143 @@ function kyivToUtc(year, month, day, hour, minute) {
   return new Date(targetLocalTime - offsetMs);
 }
 
+function getKyivDayRange(dayOffset = 0) {
+  const now = getNowInKyiv();
+  const d = new Date(Date.UTC(now.year, now.month - 1, now.day + dayOffset));
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + 1;
+  const day = d.getUTCDate();
+
+  const startUtc = kyivToUtc(y, m, day, 0, 0);
+  const endUtc = kyivToUtc(y, m, day, 23, 59);
+  const formattedDate = `${String(day).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+  return { startIso: startUtc.toISOString(), endIso: endUtc.toISOString(), formattedDate };
+}
+
+async function getRemindersForRange(chatId, startIso, endIso) {
+  const supabase = getSupabaseClient();
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('reminders')
+    .select('*')
+    .eq('user_id', String(chatId))
+    .gte('remind_at', startIso)
+    .lte('remind_at', endIso)
+    .order('remind_at', { ascending: true });
+  return data || [];
+}
+
+async function handleTodayCommand(chatId, botToken, siteUrl) {
+  const { startIso, endIso, formattedDate } = getKyivDayRange(0);
+  const list = await getRemindersForRange(chatId, startIso, endIso);
+
+  if (list.length === 0) {
+    const text =
+      `📅 <b>Плани на сьогодні (${formattedDate}):</b>\n\n` +
+      `🎉 <i>На сьогодні немає запланованих справ!</i>\n\n` +
+      `Гарного дня! Надішліть повідомлення, якщо потрібно щось запланувати.`;
+    await sendBotMessage(botToken, chatId, text, siteUrl);
+    return;
+  }
+
+  const itemsText = list
+    .map((r, i) => {
+      const time = new Date(r.remind_at).toLocaleTimeString('uk-UA', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Kyiv',
+      });
+      const status = r.is_sent ? '✅' : '⏰';
+      const tag = r.category && r.category !== 'main' ? ` #${r.category}` : '';
+      return `${i + 1}. ${status} <b>${time}</b> — ${r.title}${tag}`;
+    })
+    .join('\n');
+
+  const text =
+    `📅 <b>Ваші плани на сьогодні (${formattedDate}):</b>\n\n` +
+    itemsText +
+    `\n\n💡 <i>Всього справ: ${list.length}</i>`;
+
+  await sendBotMessage(botToken, chatId, text, siteUrl);
+}
+
+async function handleTomorrowCommand(chatId, botToken, siteUrl) {
+  const { startIso, endIso, formattedDate } = getKyivDayRange(1);
+  const list = await getRemindersForRange(chatId, startIso, endIso);
+
+  if (list.length === 0) {
+    const text =
+      `🌅 <b>Плани на завтра (${formattedDate}):</b>\n\n` +
+      `🏖 <i>На завтра нагадувань не заплановано.</i>`;
+    await sendBotMessage(botToken, chatId, text, siteUrl);
+    return;
+  }
+
+  const itemsText = list
+    .map((r, i) => {
+      const time = new Date(r.remind_at).toLocaleTimeString('uk-UA', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Kyiv',
+      });
+      return `${i + 1}. ⏰ <b>${time}</b> — ${r.title}`;
+    })
+    .join('\n');
+
+  const text =
+    `🌅 <b>Ваші плани на завтра (${formattedDate}):</b>\n\n` +
+    itemsText;
+
+  await sendBotMessage(botToken, chatId, text, siteUrl);
+}
+
+async function handleWeekCommand(chatId, botToken, siteUrl) {
+  const start = getKyivDayRange(0).startIso;
+  const end = getKyivDayRange(7).endIso;
+  const list = await getRemindersForRange(chatId, start, end);
+
+  if (list.length === 0) {
+    const text = `📆 <b>Розклад на найближчі 7 днів:</b>\n\n🏖 <i>Запланованих справ немає.</i>`;
+    await sendBotMessage(botToken, chatId, text, siteUrl);
+    return;
+  }
+
+  const groups = {};
+  list.forEach((r) => {
+    const dStr = new Date(r.remind_at).toLocaleDateString('uk-UA', {
+      timeZone: 'Europe/Kyiv',
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+    });
+    if (!groups[dStr]) groups[dStr] = [];
+    groups[dStr].push(r);
+  });
+
+  const lines = Object.entries(groups)
+    .map(([dateLabel, items]) => {
+      const subs = items
+        .map((it) => {
+          const time = new Date(it.remind_at).toLocaleTimeString('uk-UA', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Kyiv',
+          });
+          return `  • <b>${time}</b> — ${it.title}`;
+        })
+        .join('\n');
+      return `📌 <b>${dateLabel}:</b>\n${subs}`;
+    })
+    .join('\n\n');
+
+  const text = `📆 <b>Розклад на найближчі 7 днів:</b>\n\n` + lines;
+  await sendBotMessage(botToken, chatId, text, siteUrl);
+}
+
 function tryParseQuickReminder(text) {
   let workingText = text.trim();
   const now = getNowInKyiv();
 
-  // 1. Time parsing: HH:MM with colon, or 'о/об HH(:MM)?'
   let hours, minutes;
   const colonTimeMatch = workingText.match(/(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)/);
   const wordTimeMatch =
@@ -182,7 +322,6 @@ function tryParseQuickReminder(text) {
     workingText = workingText.replace(wordTimeMatch[0], ' ');
   }
 
-  // 2. Date parsing: DD.MM.YYYY, DD.MM, or keywords
   const fullDateMatch = workingText.match(
     /(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](\d{4})(?!\d)/
   );
@@ -293,20 +432,7 @@ async function handleQuickReminder(chatId, parsed, botToken, siteUrl) {
     `📅 Дата: <b>${dateFormatted}</b>\n` +
     `⏰ Час: <b>${timeFormatted}</b>`;
 
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: replyText,
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '📅 Переглянути в Календарі', web_app: { url: siteUrl } }],
-        ],
-      },
-    }),
-  });
+  await sendBotMessage(botToken, chatId, replyText, siteUrl);
 }
 
 export default async (req) => {
@@ -361,6 +487,7 @@ export default async (req) => {
     const text = (message.text || '').trim();
     const lowerText = text.toLowerCase();
 
+    // 1. Auth code requests
     const isCodeRequest =
       lowerText.startsWith('/code') ||
       lowerText.startsWith('/login') ||
@@ -377,6 +504,43 @@ export default async (req) => {
       });
     }
 
+    // 2. Today command
+    if (lowerText === '/today' || lowerText === '/сьогодні' || lowerText === 'сьогодні') {
+      await handleTodayCommand(chatId, botToken, siteUrl);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 3. Tomorrow command
+    if (lowerText === '/tomorrow' || lowerText === '/завтра' || lowerText === 'завтра') {
+      await handleTomorrowCommand(chatId, botToken, siteUrl);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 4. Week schedule command
+    if (lowerText === '/week' || lowerText === '/тиждень' || lowerText === 'тиждень') {
+      await handleWeekCommand(chatId, botToken, siteUrl);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 5. Help command
+    if (lowerText === '/help' || lowerText === '/довідка' || lowerText === 'допомога') {
+      await sendHelp(chatId, botToken, siteUrl);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 6. Quick reminder parser
     const quickReminder = tryParseQuickReminder(text);
     if (quickReminder) {
       await handleQuickReminder(chatId, quickReminder, botToken, siteUrl);

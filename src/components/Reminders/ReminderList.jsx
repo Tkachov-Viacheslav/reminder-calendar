@@ -165,6 +165,7 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
               onToggleSent={handleToggleSent}
               onDelete={deleteReminder}
               onEdit={onEditReminder}
+              onUpdate={updateReminder}
             />
           ))
         )}

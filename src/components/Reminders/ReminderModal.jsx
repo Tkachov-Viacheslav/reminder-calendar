@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Tag, FileText, Check, Pencil, Plus, Bell, Repeat } from 'lucide-react';
+import { X, Calendar, Clock, Tag, FileText, Check, Pencil, Plus, Bell, Repeat, ListTodo } from 'lucide-react';
 import {
   SYSTEM_CATEGORIES,
   DEFAULT_CATEGORY,
@@ -29,10 +29,36 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
   const [description, setDescription] = useState('');
   const [repeatType, setRepeatType] = useState('none');
   const [remindBefore, setRemindBefore] = useState(0);
+  const [items, setItems] = useState([]);
+  const [newItemText, setNewItemText] = useState('');
   const [error, setError] = useState('');
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
+
+  const handleAddItem = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = newItemText.trim();
+    if (!trimmed) return;
+    setItems((prev) => [
+      ...prev,
+      { id: `it-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: trimmed, done: false }
+    ]);
+    setNewItemText('');
+    triggerHaptic('light');
+  };
+
+  const handleDeleteItem = (id) => {
+    setItems((prev) => prev.filter((it) => it.id !== id));
+    triggerHaptic('light');
+  };
+
+  const handleToggleItem = (id) => {
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, done: !it.done } : it))
+    );
+    triggerHaptic('light');
+  };
 
   const handleAddCustomCategory = async (e) => {
     e.preventDefault();
@@ -73,6 +99,7 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setDescription(editingReminder.description || '');
       setCategory(editingReminder.category || DEFAULT_CATEGORY);
       setRepeatType(editingReminder.repeat_type || 'none');
+      setItems(Array.isArray(editingReminder.items) ? editingReminder.items : []);
       const remindBeforeVal = editingReminder.remind_before || 0;
       setRemindBefore(remindBeforeVal);
       const remDate = new Date(editingReminder.remind_at);
@@ -89,6 +116,8 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setCategory(DEFAULT_CATEGORY);
       setRepeatType('none');
       setRemindBefore(0);
+      setItems([]);
+      setNewItemText('');
       setDateStr(toISODateString(initialDate || new Date()));
       setTimeStr(getDefaultTime());
     }
@@ -118,6 +147,7 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       remind_at: remindAtDate.toISOString(),
       repeat_type: repeatType,
       remind_before: Number(remindBefore),
+      items,
       ...(editingReminder ? { is_sent: false } : {}),
     });
 
@@ -238,6 +268,7 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
               >
                 <option value="none">Не повторювати</option>
                 <option value="daily">Щодня</option>
+                <option value="weekdays">Щобудня (Пн–Пт)</option>
                 <option value="weekly">Щотижня</option>
                 <option value="monthly">Щомісяця</option>
               </select>
@@ -350,6 +381,84 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
                   <span>Категорія</span>
                 </button>
               )}
+            </div>
+          </div>
+
+          {/* Checklist / Subtasks */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <ListTodo className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Підзавдання / Чек-лист</span>
+              </label>
+              {items.length > 0 && (
+                <span className="text-[11px] text-slate-400">
+                  {items.filter((i) => i.done).length}/{items.length}
+                </span>
+              )}
+            </div>
+
+            {items.length > 0 && (
+              <div className="space-y-1.5 mb-2 max-h-32 overflow-y-auto pr-1">
+                {items.map((it) => (
+                  <div
+                    key={it.id}
+                    className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleItem(it.id)}
+                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                        it.done
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
+                          : 'border-slate-300 dark:border-slate-600 hover:border-indigo-500'
+                      }`}
+                    >
+                      {it.done && <Check className="w-3 h-3 stroke-[3]" />}
+                    </button>
+                    <span
+                      className={`flex-1 break-words ${
+                        it.done
+                          ? 'line-through text-slate-400 dark:text-slate-500'
+                          : 'text-slate-800 dark:text-slate-200'
+                      }`}
+                    >
+                      {it.text}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(it.id)}
+                      className="text-slate-400 hover:text-rose-500 p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={newItemText}
+                onChange={(e) => setNewItemText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddItem();
+                  }
+                }}
+                placeholder="Додати пункт чек-листа..."
+                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+              />
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Додати</span>
+              </button>
             </div>
           </div>
 
