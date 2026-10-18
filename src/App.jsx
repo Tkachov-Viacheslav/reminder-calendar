@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { TelegramProvider } from './context/TelegramContext';
 import { TeamProvider, useTeam } from './context/TeamContext';
 import { ReminderProvider, useReminders } from './context/ReminderContext';
