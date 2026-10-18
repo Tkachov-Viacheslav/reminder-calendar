@@ -1,228 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Calendar,
-  Clock,
-  Tag,
-  FileText,
-  Check,
-  Pencil,
-  Plus,
-  Bell,
-  Repeat,
-  ListTodo,
-  Users,
-  Hash,
-  MessageSquare,
-} from 'lucide-react';
-import {
-  SYSTEM_CATEGORIES,
-  DEFAULT_CATEGORY,
-  getCategoryMeta,
-} from '../../utils/constants';
-import { toISODateString } from '../../utils/dateUtils';
+import React from 'react';
+import { Calendar, Pencil, Check } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
 import { useTeam } from '../../context/TeamContext';
 import { useReminders } from '../../context/ReminderContext';
-import { Modal, Button } from '../ui';
+import { useReminderForm } from '../../hooks/useReminderForm';
+import { Modal, Button, Input, Select } from '../ui';
+import { CategoryChips } from './CategoryChips';
+import { ChecklistEditor } from './ChecklistEditor';
+import { TeamMetaEditor } from './TeamMetaEditor';
 
-export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingReminder }) {
-  const { triggerHaptic } = useTelegram();
+export function ReminderModal({
+  isOpen,
+  onClose,
+  onSave,
+  initialDate,
+  editingReminder,
+}) {
+  const { triggerHaptic, setClosingConfirmation } = useTelegram();
   const { currentTeam, teamMembers, teamTopics } = useTeam();
-  const { customCategories, addCustomCategory, deleteCustomCategory } = useReminders();
+  const { customCategories } = useReminders();
 
-  const getDefaultTime = () => {
-    const d = new Date();
-    d.setHours(d.getHours() + 1, 0, 0, 0);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
-  };
-
-  const [title, setTitle] = useState('');
-  const [dateStr, setDateStr] = useState(() => toISODateString(initialDate || new Date()));
-  const [timeStr, setTimeStr] = useState(getDefaultTime);
-  const [category, setCategory] = useState(DEFAULT_CATEGORY);
-  const [description, setDescription] = useState('');
-  const [repeatType, setRepeatType] = useState('none');
-  const [remindBefore, setRemindBefore] = useState(0);
-  const [items, setItems] = useState([]);
-  const [newItemText, setNewItemText] = useState('');
-  const [threadId, setThreadId] = useState(null);
-  const [taggedMembers, setTaggedMembers] = useState([]);
-  const [customTagInput, setCustomTagInput] = useState('');
-  const [error, setError] = useState('');
-
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newCatInput, setNewCatInput] = useState('');
-
-  const handleToggleMemberTag = (member) => {
-    const memberId = String(member.telegram_id);
-    const isTagged = taggedMembers.some((m) => m.id === memberId);
-    if (isTagged) {
-      setTaggedMembers((prev) => prev.filter((m) => m.id !== memberId));
-    } else {
-      setTaggedMembers((prev) => [
-        ...prev,
-        {
-          id: memberId,
-          name: member.first_name || '',
-          username: member.username || '',
-        },
-      ]);
+  React.useEffect(() => {
+    if (isOpen) {
+      setClosingConfirmation?.(true);
+      return () => setClosingConfirmation?.(false);
     }
-    triggerHaptic('light');
-  };
+  }, [isOpen, setClosingConfirmation]);
 
-  const handleRemoveTagged = (indexToRemove) => {
-    setTaggedMembers((prev) => prev.filter((_, idx) => idx !== indexToRemove));
-    triggerHaptic('light');
-  };
-
-  const handleAddCustomTag = (e) => {
-    if (e) e.preventDefault();
-    const trimmed = customTagInput.trim();
-    if (!trimmed) return;
-    const cleanUsername = trimmed.replace(/^@/, '');
-    setTaggedMembers((prev) => [
-      ...prev,
-      {
-        id: '',
-        name: trimmed,
-        username: cleanUsername,
-      },
-    ]);
-    setCustomTagInput('');
-    triggerHaptic('light');
-  };
-
-  const handleAddItem = (e) => {
-    if (e) e.preventDefault();
-    const trimmed = newItemText.trim();
-    if (!trimmed) return;
-    setItems((prev) => [
-      ...prev,
-      { id: `it-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, text: trimmed, done: false }
-    ]);
-    setNewItemText('');
-    triggerHaptic('light');
-  };
-
-  const handleDeleteItem = (id) => {
-    setItems((prev) => prev.filter((it) => it.id !== id));
-    triggerHaptic('light');
-  };
-
-  const handleToggleItem = (id) => {
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, done: !it.done } : it))
-    );
-    triggerHaptic('light');
-  };
-
-  const handleAddCustomCategory = async (e) => {
-    e.preventDefault();
-    const trimmed = newCatInput.trim();
-    if (!trimmed) return;
-    if (trimmed.toLowerCase() === 'головне' || trimmed.toLowerCase() === 'main') {
-      setCategory('main');
-      setIsAddingCategory(false);
-      setNewCatInput('');
-      return;
-    }
-    if (trimmed.toLowerCase() === 'інше' || trimmed.toLowerCase() === 'other') {
-      setCategory('other');
-      setIsAddingCategory(false);
-      setNewCatInput('');
-      return;
-    }
-    await addCustomCategory(trimmed);
-    setCategory(trimmed);
-    setNewCatInput('');
-    setIsAddingCategory(false);
-    triggerHaptic('light');
-  };
-
-  const handleDeleteCustomCategory = async (e, catToDelete) => {
-    e.stopPropagation();
-    await deleteCustomCategory(catToDelete);
-    if (category === catToDelete) {
-      setCategory(DEFAULT_CATEGORY);
-    }
-    triggerHaptic('light');
-  };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (editingReminder) {
-      setTitle(editingReminder.title || '');
-      setDescription(editingReminder.description || '');
-      setCategory(editingReminder.category || DEFAULT_CATEGORY);
-      setRepeatType(editingReminder.repeat_type || 'none');
-      setItems(Array.isArray(editingReminder.items) ? editingReminder.items : []);
-      setThreadId(editingReminder.thread_id || null);
-      setTaggedMembers(
-        Array.isArray(editingReminder.tagged_members) ? editingReminder.tagged_members : []
-      );
-      setCustomTagInput('');
-      const remindBeforeVal = editingReminder.remind_before || 0;
-      setRemindBefore(remindBeforeVal);
-      const remDate = new Date(editingReminder.remind_at);
-      if (remindBeforeVal) {
-        remDate.setTime(remDate.getTime() + Number(remindBeforeVal) * 60 * 1000);
-      }
-      setDateStr(toISODateString(remDate));
-      const hh = String(remDate.getHours()).padStart(2, '0');
-      const mm = String(remDate.getMinutes()).padStart(2, '0');
-      setTimeStr(`${hh}:${mm}`);
-    } else {
-      setTitle('');
-      setDescription('');
-      setCategory(DEFAULT_CATEGORY);
-      setRepeatType('none');
-      setRemindBefore(0);
-      setItems([]);
-      setNewItemText('');
-      setThreadId(null);
-      setTaggedMembers([]);
-      setCustomTagInput('');
-      setDateStr(toISODateString(initialDate || new Date()));
-      setTimeStr(getDefaultTime());
-    }
-    setError('');
-  }, [isOpen, editingReminder, initialDate]);
+  const form = useReminderForm({
+    isOpen,
+    editingReminder,
+    initialDate,
+    onSave,
+    onClose,
+  });
 
   if (!isOpen) return null;
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      setError('Будь ласка, вкажіть назву нагадування');
-      triggerHaptic('error');
-      return;
-    }
-
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const eventDate = new Date(year, month - 1, day, hours, minutes);
-    const remindAtDate = new Date(eventDate.getTime() - Number(remindBefore) * 60 * 1000);
-
-    triggerHaptic('success');
-    onSave({
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      remind_at: remindAtDate.toISOString(),
-      repeat_type: repeatType,
-      remind_before: Number(remindBefore),
-      items,
-      thread_id: threadId ? Number(threadId) : null,
-      tagged_members: taggedMembers,
-      ...(editingReminder ? { is_sent: false } : {}),
-    });
-
-    onClose();
-  };
 
   return (
     <Modal
@@ -238,419 +51,131 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       }
       maxWidth="max-w-md"
     >
-      <form onSubmit={handleSubmit} className="p-4 space-y-3.5">
-          {error && (
-            <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-medium border border-rose-200 dark:border-rose-900">
-              {error}
-            </div>
-          )}
-
-          {/* Title */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Назва події *
-            </label>
-            <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                if (error) setError('');
-              }}
-              placeholder="Наприклад: Зустріч з клієнтом або Прийом ліків"
-              className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
-            />
+      <form onSubmit={form.handleSubmit} className="p-4 space-y-3.5">
+        {form.error && (
+          <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-medium border border-rose-200 dark:border-rose-900">
+            {form.error}
           </div>
+        )}
 
-          {/* Date and Time */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Дата
-              </label>
-              <div className="relative">
-                <input
-                  type="date"
-                  required
-                  value={dateStr}
-                  onChange={(e) => setDateStr(e.target.value)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-            </div>
+        {/* Title */}
+        <Input
+          label="Назва події *"
+          required
+          value={form.title}
+          onChange={(e) => {
+            form.setTitle(e.target.value);
+            if (form.error) form.setError('');
+          }}
+          placeholder="Наприклад: Зустріч з клієнтом або Прийом ліків"
+        />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Час нагадування
-              </label>
-              <div className="relative">
-                <input
-                  type="time"
-                  required
-                  value={timeStr}
-                  onChange={(e) => setTimeStr(e.target.value)}
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-            </div>
-          </div>
+        {/* Date and Time */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Input
+            label="Дата"
+            type="date"
+            required
+            value={form.dateStr}
+            onChange={(e) => form.setDateStr(e.target.value)}
+          />
+          <Input
+            label="Час нагадування"
+            type="time"
+            required
+            value={form.timeStr}
+            onChange={(e) => form.setTimeStr(e.target.value)}
+          />
+        </div>
 
-          {/* Remind Before & Repeat */}
-          <div className="grid grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                <Bell className="w-3 h-3 text-indigo-500" />
-                <span>Попередження</span>
-              </label>
-              <select
-                value={remindBefore}
-                onChange={(e) => setRemindBefore(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 cursor-pointer"
-              >
-                <option value={0}>Вчасно</option>
-                <option value={15}>За 15 хв</option>
-                <option value={30}>За 30 хв</option>
-                <option value={60}>За 1 год</option>
-                <option value={1440}>За 1 день</option>
-              </select>
-            </div>
+        {/* Remind Before & Repeat */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Select
+            label="Попередження"
+            value={form.remindBefore}
+            onChange={(e) => form.setRemindBefore(Number(e.target.value))}
+          >
+            <option value={0}>Вчасно</option>
+            <option value={15}>За 15 хв</option>
+            <option value={30}>За 30 хв</option>
+            <option value={60}>За 1 год</option>
+            <option value={1440}>За 1 день</option>
+          </Select>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
-                <Repeat className="w-3 h-3 text-indigo-500" />
-                <span>Повторення</span>
-              </label>
-              <select
-                value={repeatType}
-                onChange={(e) => setRepeatType(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 cursor-pointer"
-              >
-                <option value="none">Не повторювати</option>
-                <option value="daily">Щодня</option>
-                <option value="weekdays">Щобудня (Пн–Пт)</option>
-                <option value="weekly">Щотижня</option>
-                <option value="monthly">Щомісяця</option>
-              </select>
-            </div>
-          </div>
+          <Select
+            label="Повторення"
+            value={form.repeatType}
+            onChange={(e) => form.setRepeatType(e.target.value)}
+          >
+            <option value="none">Не повторювати</option>
+            <option value="daily">Щодня</option>
+            <option value="weekdays">Щобудня (Пн–Пт)</option>
+            <option value="weekly">Щотижня</option>
+            <option value="monthly">Щомісяця</option>
+          </Select>
+        </div>
 
-          {/* Category Chips */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Категорія
-            </label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {/* System Categories: Головне & Інше */}
-              {Object.values(SYSTEM_CATEGORIES).map((cat) => {
-                const isSelected = category === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setCategory(cat.id);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
-                      isSelected
-                        ? `${cat.color} font-bold ring-2 ring-indigo-500/40 shadow-sm`
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                );
-              })}
+        {/* Categories */}
+        <CategoryChips
+          category={form.category}
+          onSelectCategory={(catId) => {
+            triggerHaptic('light');
+            form.setCategory(catId);
+          }}
+          customCategories={customCategories}
+          onAddCustomCategory={form.handleAddCategory}
+          onDeleteCustomCategory={form.handleDeleteCategory}
+        />
 
-              {/* Custom Categories */}
-              {customCategories.map((catName) => {
-                const meta = getCategoryMeta(catName);
-                const isSelected = category === catName;
-                return (
-                  <div
-                    key={catName}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      setCategory(catName);
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    className={`flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-medium border cursor-pointer transition-all ${
-                      isSelected
-                        ? `${meta.color} font-bold ring-2 ring-indigo-500/40 shadow-sm`
-                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    <span>{catName}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDeleteCustomCategory(e, catName)}
-                      className="text-slate-400 hover:text-rose-500 p-0.5 rounded transition-colors"
-                      title="Видалити категорію"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
+        {/* Subtasks / Checklist */}
+        <ChecklistEditor
+          items={form.items}
+          onAddItem={form.handleAddItem}
+          onToggleItem={form.handleToggleItem}
+          onDeleteItem={form.handleDeleteItem}
+        />
 
-              {/* Add Custom Category Button or Input */}
-              {isAddingCategory ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="Назва..."
-                    maxLength={20}
-                    value={newCatInput}
-                    onChange={(e) => setNewCatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddCustomCategory(e);
-                      if (e.key === 'Escape') setIsAddingCategory(false);
-                    }}
-                    className="px-2 py-0.5 text-xs bg-slate-50 dark:bg-slate-800 border border-indigo-400 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none w-24"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomCategory}
-                    className="p-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-                    title="Зберегти категорію"
-                  >
-                    <Check className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingCategory(false);
-                      setNewCatInput('');
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-                    title="Скасувати"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsAddingCategory(true)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-dashed border-indigo-300 dark:border-indigo-700/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Категорія</span>
-                </button>
-              )}
-            </div>
-          </div>
+        {/* Team fields (Forum topic & Tagged members) */}
+        <TeamMetaEditor
+          currentTeam={currentTeam}
+          teamTopics={teamTopics}
+          teamMembers={teamMembers}
+          threadId={form.threadId}
+          setThreadId={form.setThreadId}
+          taggedMembers={form.taggedMembers}
+          onToggleMemberTag={form.handleToggleMemberTag}
+          onRemoveTagged={form.handleRemoveTagged}
+          onAddCustomTag={form.handleAddCustomTag}
+        />
 
-          {/* Checklist / Subtasks */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <ListTodo className="w-3.5 h-3.5 text-indigo-500" />
-                <span>Підзавдання / Чек-лист</span>
-              </label>
-              {items.length > 0 && (
-                <span className="text-[11px] text-slate-400">
-                  {items.filter((i) => i.done).length}/{items.length}
-                </span>
-              )}
-            </div>
+        {/* Description */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            Опис чи нотатка (необов'язково)
+          </label>
+          <textarea
+            rows={2}
+            value={form.description}
+            onChange={(e) => form.setDescription(e.target.value)}
+            placeholder="Додаткові деталі, посилання або контакти..."
+            className="w-full px-3 py-2 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 placeholder-slate-400 resize-none transition-colors"
+          />
+        </div>
 
-            {items.length > 0 && (
-              <div className="space-y-1.5 mb-2 max-h-32 overflow-y-auto pr-1">
-                {items.map((it) => (
-                  <div
-                    key={it.id}
-                    className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleToggleItem(it.id)}
-                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                        it.done
-                          ? 'bg-emerald-500 border-emerald-500 text-white'
-                          : 'border-slate-300 dark:border-slate-600 hover:border-indigo-500'
-                      }`}
-                    >
-                      {it.done && <Check className="w-3 h-3 stroke-[3]" />}
-                    </button>
-                    <span
-                      className={`flex-1 break-words ${
-                        it.done
-                          ? 'line-through text-slate-400 dark:text-slate-500'
-                          : 'text-slate-800 dark:text-slate-200'
-                      }`}
-                    >
-                      {it.text}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteItem(it.id)}
-                      className="text-slate-400 hover:text-rose-500 p-0.5"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                value={newItemText}
-                onChange={(e) => setNewItemText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddItem();
-                  }
-                }}
-                placeholder="Додати пункт чек-листа..."
-                className="flex-1 px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
-              />
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                <span>Додати</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Team Fields: Topic & Tagged Members */}
-          {currentTeam && (
-            <div className="p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200/60 dark:border-violet-900/40 space-y-3">
-              {/* Forum Topic Selector */}
-              <div>
-                <label className="text-xs font-semibold text-violet-950 dark:text-violet-200 flex items-center gap-1.5 mb-1">
-                  <Hash className="w-3.5 h-3.5 text-violet-500" />
-                  <span>Тема форуму (куди надіслати)</span>
-                </label>
-                <select
-                  value={threadId || 0}
-                  onChange={(e) => setThreadId(Number(e.target.value) || null)}
-                  className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
-                >
-                  <option value="0">За замовчуванням (з прив'язки категорії)</option>
-                  {teamTopics.map((topic) => (
-                    <option key={topic.id} value={topic.thread_id}>
-                      #{topic.name || `Тема ${topic.thread_id}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Tagged Members */}
-              <div>
-                <label className="text-xs font-semibold text-violet-950 dark:text-violet-200 flex items-center gap-1.5 mb-1.5">
-                  <Users className="w-3.5 h-3.5 text-violet-500" />
-                  <span>Відповідальні (кого тегнути ботом)</span>
-                </label>
-
-                {/* Selected chips */}
-                {taggedMembers.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {taggedMembers.map((tm, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200 text-xs font-medium"
-                      >
-                        <span>{tm.username ? `@${tm.username}` : tm.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTagged(idx)}
-                          className="hover:text-rose-500"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Autocomplete from known chat members */}
-                {teamMembers.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2 max-h-20 overflow-y-auto">
-                    {teamMembers.map((m) => {
-                      const isSelected = taggedMembers.some((t) => t.id === String(m.telegram_id));
-                      return (
-                        <button
-                          type="button"
-                          key={m.id}
-                          onClick={() => handleToggleMemberTag(m)}
-                          className={`px-2 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${
-                            isSelected
-                              ? 'bg-violet-600 text-white border-violet-600'
-                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-violet-400'
-                          }`}
-                        >
-                          {m.first_name || (m.username ? `@${m.username}` : 'Учасник')}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Custom tag input */}
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    value={customTagInput}
-                    onChange={(e) => setCustomTagInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddCustomTag();
-                      }
-                    }}
-                    placeholder="@username або ім'я..."
-                    className="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddCustomTag}
-                    className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold"
-                  >
-                    + Тег
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Опис чи нотатка (необов'язково)
-            </label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Додаткові деталі, посилання або контакти..."
-              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-100 resize-none"
-            />
-          </div>
-
-          {/* Submit button */}
-          <div className="pt-2 flex items-center justify-end gap-2">
-            <Button variant="ghost" onClick={onClose}>
-              Скасувати
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              icon={<Check className="w-4 h-4" />}
-            >
-              {editingReminder ? 'Зберегти зміни' : 'Зберегти нагадування'}
-            </Button>
-          </div>
-        </form>
+        {/* Actions */}
+        <div className="pt-2 flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Скасувати
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            icon={<Check className="w-4 h-4" />}
+          >
+            {editingReminder ? 'Зберегти зміни' : 'Зберегти нагадування'}
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 }

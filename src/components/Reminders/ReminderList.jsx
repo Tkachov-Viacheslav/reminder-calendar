@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Bell, Calendar as CalendarIcon, Search, X } from 'lucide-react';
 import { ReminderCard } from './ReminderCard';
 import { formatDateUkrainian, isSameDay } from '../../utils/dateUtils';
@@ -15,31 +15,44 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const dayReminders = reminders.filter((r) => isSameDay(r.remind_at, selectedDate));
+  const dayReminders = useMemo(() => {
+    return reminders
+      .filter((r) => isSameDay(r.remind_at, selectedDate))
+      .sort((a, b) => new Date(a.remind_at) - new Date(b.remind_at));
+  }, [reminders, selectedDate]);
 
-  const upcomingReminders = reminders
-    .filter((r) => new Date(r.remind_at) >= new Date() && !r.is_sent)
-    .sort((a, b) => new Date(a.remind_at) - new Date(b.remind_at));
+  const upcomingReminders = useMemo(() => {
+    return reminders
+      .filter((r) => !r.is_sent)
+      .sort((a, b) => new Date(a.remind_at) - new Date(b.remind_at));
+  }, [reminders]);
 
   const baseList = showAllUpcoming ? upcomingReminders : dayReminders;
 
-  const filteredList = baseList.filter((r) => {
-    if (selectedCategory !== 'all') {
-      const rCat = (r.category || 'main').toLowerCase();
-      if (rCat !== selectedCategory.toLowerCase()) return false;
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const matchTitle = (r.title || '').toLowerCase().includes(q);
-      const matchDesc = (r.description || '').toLowerCase().includes(q);
-      if (!matchTitle && !matchDesc) return false;
-    }
-    return true;
-  });
+  const filteredList = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const cat = selectedCategory.toLowerCase();
 
-  const handleToggleSent = (id, newSent) => {
-    updateReminder(id, { is_sent: newSent });
-  };
+    return baseList.filter((r) => {
+      if (cat !== 'all') {
+        const rCat = (r.category || 'main').toLowerCase();
+        if (rCat !== cat) return false;
+      }
+      if (q) {
+        const matchTitle = (r.title || '').toLowerCase().includes(q);
+        const matchDesc = (r.description || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchDesc) return false;
+      }
+      return true;
+    });
+  }, [baseList, selectedCategory, searchQuery]);
+
+  const handleToggleSent = useCallback(
+    (id, newSent) => {
+      updateReminder(id, { is_sent: newSent });
+    },
+    [updateReminder]
+  );
 
   const isFilterActive = searchQuery.trim() !== '' || selectedCategory !== 'all';
 

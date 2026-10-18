@@ -114,122 +114,151 @@ export function ReminderProvider({ children }) {
 
   useEffect(() => {
     fetchReminders();
-  }, [fetchReminders]);
 
-  const addReminder = async (item) => {
-    triggerHaptic('light');
-    const newReminder = {
-      ...item,
-      id: item.id || `rem-${Date.now()}`,
-      user_id: activeUserId || 'guest',
-      team_id: activeTeamId || null,
-      created_by_name: user?.first_name || user?.username || '',
-      is_sent: false,
-      created_at: new Date().toISOString()
+    const handleSync = () => {
+      if (document.visibilityState === 'visible') {
+        fetchReminders();
+      }
     };
 
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { data, error } = await supabase.from('reminders').insert([newReminder]).select();
-        if (error) throw error;
-        if (data?.[0]) {
-          setReminders((prev) => [...prev, data[0]]);
-          return data[0];
+    document.addEventListener('visibilitychange', handleSync);
+    window.addEventListener('online', handleSync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleSync);
+      window.removeEventListener('online', handleSync);
+    };
+  }, [fetchReminders]);
+
+  const addReminder = useCallback(
+    async (item) => {
+      triggerHaptic('light');
+      const newReminder = {
+        ...item,
+        id: item.id || `rem-${Date.now()}`,
+        user_id: activeUserId || 'guest',
+        team_id: activeTeamId || null,
+        created_by_name: user?.first_name || user?.username || '',
+        is_sent: false,
+        created_at: new Date().toISOString(),
+      };
+
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { data, error } = await supabase.from('reminders').insert([newReminder]).select();
+          if (error) throw error;
+          if (data?.[0]) {
+            setReminders((prev) => [...prev, data[0]]);
+            return data[0];
+          }
+        } catch (e) {
+          console.error('Error saving to Supabase, saving locally', e);
         }
-      } catch (e) {
-        console.error('Error saving to Supabase, saving locally', e);
       }
-    }
 
-    setReminders((prev) => {
-      const updated = [...prev, newReminder];
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      return updated;
-    });
-    return newReminder;
-  };
+      setReminders((prev) => {
+        const updated = [...prev, newReminder];
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        return updated;
+      });
+      return newReminder;
+    },
+    [activeUserId, activeTeamId, user, storageKey, triggerHaptic]
+  );
 
-  const updateReminder = async (id, updates) => {
-    triggerHaptic('light');
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { error } = await supabase.from('reminders').update(updates).eq('id', id);
-        if (error) throw error;
-      } catch (e) {
-        console.error('Error updating in Supabase', e);
+  const updateReminder = useCallback(
+    async (id, updates) => {
+      triggerHaptic('light');
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { error } = await supabase.from('reminders').update(updates).eq('id', id);
+          if (error) throw error;
+        } catch (e) {
+          console.error('Error updating in Supabase', e);
+        }
       }
-    }
 
-    setReminders((prev) => {
-      const updated = prev.map((r) => (r.id === id ? { ...r, ...updates } : r));
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      return updated;
-    });
-  };
+      setReminders((prev) => {
+        const updated = prev.map((r) => (r.id === id ? { ...r, ...updates } : r));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        return updated;
+      });
+    },
+    [storageKey, triggerHaptic]
+  );
 
-  const deleteReminder = async (id) => {
-    triggerHaptic('medium');
-    if (isSupabaseConfigured() && supabase) {
-      try {
-        const { error } = await supabase.from('reminders').delete().eq('id', id);
-        if (error) throw error;
-      } catch (e) {
-        console.error('Error deleting from Supabase', e);
+  const deleteReminder = useCallback(
+    async (id) => {
+      triggerHaptic('medium');
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          const { error } = await supabase.from('reminders').delete().eq('id', id);
+          if (error) throw error;
+        } catch (e) {
+          console.error('Error deleting from Supabase', e);
+        }
       }
-    }
 
-    setReminders((prev) => {
-      const updated = prev.filter((r) => r.id !== id);
-      localStorage.setItem(storageKey, JSON.stringify(updated));
-      return updated;
-    });
-  };
+      setReminders((prev) => {
+        const updated = prev.filter((r) => r.id !== id);
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        return updated;
+      });
+    },
+    [storageKey, triggerHaptic]
+  );
 
-  const addCustomCategory = async (name) => {
-    const trimmed = String(name || '').trim();
-    if (!trimmed || customCategories.includes(trimmed)) return;
+  const addCustomCategory = useCallback(
+    async (name) => {
+      const trimmed = String(name || '').trim();
+      if (!trimmed || customCategories.includes(trimmed)) return;
 
-    setCustomCategories((prev) => {
-      const updated = [...prev, trimmed];
-      try {
-        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+      setCustomCategories((prev) => {
+        const updated = [...prev, trimmed];
+        try {
+          localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
 
-    if (isSupabaseConfigured() && supabase && activeUserId) {
-      try {
-        await supabase.from('user_categories').insert({
-          user_id: activeUserId,
-          name: trimmed,
-        });
-      } catch (e) {
-        console.error('Error inserting category into Supabase', e);
+      if (isSupabaseConfigured() && supabase && activeUserId) {
+        try {
+          await supabase.from('user_categories').insert({
+            user_id: activeUserId,
+            name: trimmed,
+          });
+        } catch (e) {
+          console.error('Error inserting category into Supabase', e);
+        }
       }
-    }
-  };
+    },
+    [customCategories, activeUserId]
+  );
 
-  const deleteCustomCategory = async (name) => {
-    setCustomCategories((prev) => {
-      const updated = prev.filter((c) => c !== name);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+  const deleteCustomCategory = useCallback(
+    async (name) => {
+      setCustomCategories((prev) => {
+        const updated = prev.filter((c) => c !== name);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
 
-    if (isSupabaseConfigured() && supabase && activeUserId) {
-      try {
-        await supabase
-          .from('user_categories')
-          .delete()
-          .eq('user_id', activeUserId)
-          .eq('name', name);
-      } catch (e) {
-        console.error('Error deleting category from Supabase', e);
+      if (isSupabaseConfigured() && supabase && activeUserId) {
+        try {
+          await supabase
+            .from('user_categories')
+            .delete()
+            .eq('user_id', activeUserId)
+            .eq('name', name);
+        } catch (e) {
+          console.error('Error deleting category from Supabase', e);
+        }
       }
-    }
-  };
+    },
+    [activeUserId]
+  );
 
   return (
     <ReminderContext.Provider

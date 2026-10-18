@@ -130,11 +130,23 @@ export function TeamProvider({ children }) {
 
   useEffect(() => {
     fetchUserTeams();
-  }, [fetchUserTeams]);
-
-  useEffect(() => {
     fetchCurrentTeamData();
-  }, [fetchCurrentTeamData]);
+
+    const handleSync = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUserTeams();
+        fetchCurrentTeamData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleSync);
+    window.addEventListener('online', handleSync);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleSync);
+      window.removeEventListener('online', handleSync);
+    };
+  }, [fetchUserTeams, fetchCurrentTeamData]);
 
   const switchWorkspace = useCallback(
     (teamId) => {
@@ -221,6 +233,51 @@ export function TeamProvider({ children }) {
     [activeTeamId, triggerHaptic]
   );
 
+  const addTeamTopic = useCallback(
+    async (name, threadId) => {
+      if (!activeTeamId || !supabase) return;
+      triggerHaptic('light');
+      try {
+        const { data, error } = await supabase
+          .from('team_topics')
+          .upsert(
+            {
+              team_id: activeTeamId,
+              thread_id: Number(threadId),
+              name: name.trim(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'team_id,thread_id' }
+          )
+          .select()
+          .single();
+        if (error) throw error;
+        setTeamTopics((prev) => {
+          const filtered = prev.filter((t) => t.thread_id !== Number(threadId));
+          return [...filtered, data].sort((a, b) => a.name.localeCompare(b.name));
+        });
+      } catch (err) {
+        console.error('Failed to add team topic:', err);
+      }
+    },
+    [activeTeamId, triggerHaptic]
+  );
+
+  const deleteTeamTopic = useCallback(
+    async (topicId) => {
+      if (!activeTeamId || !supabase) return;
+      triggerHaptic('light');
+      try {
+        const { error } = await supabase.from('team_topics').delete().eq('id', topicId);
+        if (error) throw error;
+        setTeamTopics((prev) => prev.filter((t) => t.id !== topicId));
+      } catch (err) {
+        console.error('Failed to delete team topic:', err);
+      }
+    },
+    [activeTeamId, triggerHaptic]
+  );
+
   const isTeamAdmin = userRole === 'admin';
   const canEdit = userRole === 'admin' || userRole === 'editor' || userRole === 'owner';
 
@@ -241,6 +298,8 @@ export function TeamProvider({ children }) {
         updateTeamSettings,
         updateMemberRole,
         setCategoryTopicMapping,
+        addTeamTopic,
+        deleteTeamTopic,
         refreshTeamData: fetchCurrentTeamData,
         refreshUserTeams: fetchUserTeams,
       }}

@@ -89,6 +89,21 @@ export function TelegramProvider({ children }) {
     localStorage.removeItem(LOCAL_STORAGE_USER);
   };
 
+  const setClosingConfirmation = useCallback((enabled) => {
+    try {
+      const tg = window?.Telegram?.WebApp;
+      if (tg?.isVersionAtLeast?.('6.2')) {
+        if (enabled) {
+          tg.enableClosingConfirmation();
+        } else {
+          tg.disableClosingConfirmation();
+        }
+      }
+    } catch {
+      // Closing confirmation not supported
+    }
+  }, []);
+
   useEffect(() => {
     // 1. Check if running inside Telegram Mini App
     const tg = window?.Telegram?.WebApp;
@@ -96,6 +111,12 @@ export function TelegramProvider({ children }) {
       setIsInTelegram(true);
       tg.ready();
       tg.expand();
+
+      try {
+        tg.setHeaderColor?.('#0f172a');
+        tg.setBackgroundColor?.('#020617');
+      } catch {}
+
       const tgU = tg.initDataUnsafe.user;
       const photoUrl =
         tgU.photo_url || (tgU.username ? `https://t.me/i/userpic/320/${tgU.username}.jpg` : '');
@@ -135,6 +156,7 @@ export function TelegramProvider({ children }) {
         loginWithTelegram,
         logout,
         triggerHaptic,
+        setClosingConfirmation,
       }}
     >
       {children}

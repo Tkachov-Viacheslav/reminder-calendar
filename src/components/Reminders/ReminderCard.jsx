@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Clock,
   CheckCircle2,
@@ -8,52 +8,53 @@ import {
   Pencil,
   Repeat,
   Bell,
-  Check,
-  ListTodo,
 } from 'lucide-react';
 import { getCategoryMeta } from '../../utils/constants';
 import { formatTime } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
+import { useSwipeAction } from '../../hooks/useSwipeAction';
 import { Badge } from '../ui';
+import { ReminderSwipeIndicator } from './ReminderSwipeIndicator';
+import { ReminderCardSubtasks } from './ReminderCardSubtasks';
 
-export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdate, canEdit = true }) {
+const REPEAT_LABELS = {
+  daily: 'Щодня',
+  weekdays: 'Щобудня',
+  weekly: 'Щотижня',
+  monthly: 'Щомісяця',
+};
+
+export const ReminderCard = React.memo(function ReminderCard({
+  reminder,
+  onToggleSent,
+  onDelete,
+  onEdit,
+  onUpdate,
+  canEdit = true,
+}) {
   const { triggerHaptic } = useTelegram();
   const category = getCategoryMeta(reminder.category);
   const isPast = new Date(reminder.remind_at) < new Date();
 
-  // Mobile swipe state
-  const [touchOffset, setTouchOffset] = useState(0);
-  const [touchStartX, setTouchStartX] = useState(null);
-  const [isSwiping, setIsSwiping] = useState(false);
-
-  const handleTouchStart = (e) => {
-    setTouchStartX(e.touches[0].clientX);
-    setIsSwiping(true);
-  };
-
-  const handleTouchMove = (e) => {
-    if (touchStartX === null) return;
-    const diff = e.touches[0].clientX - touchStartX;
-    if (Math.abs(diff) < 110) {
-      setTouchOffset(diff);
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (touchOffset > 65) {
+  const {
+    touchOffset,
+    isSwiping,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
+  } = useSwipeAction({
+    onSwipeRight: () => {
       triggerHaptic('success');
       onToggleSent(reminder.id, !reminder.is_sent);
-    } else if (touchOffset < -65) {
+    },
+    onSwipeLeft: () => {
       triggerHaptic('warning');
       const snoozeDate = new Date(Date.now() + 15 * 60 * 1000).toISOString();
       if (onUpdate) {
         onUpdate(reminder.id, { remind_at: snoozeDate, is_sent: false });
       }
-    }
-    setTouchOffset(0);
-    setTouchStartX(null);
-    setIsSwiping(false);
-  };
+    },
+  });
 
   const handleEdit = (e) => {
     e.stopPropagation();
@@ -87,36 +88,12 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
     onUpdate(reminder.id, { items: updated });
   };
 
-  const repeatLabels = {
-    daily: 'Щодня',
-    weekdays: 'Щобудня',
-    weekly: 'Щотижня',
-    monthly: 'Щомісяця',
-  };
-  const repeatText = repeatLabels[reminder.repeat_type] || null;
+  const repeatText = REPEAT_LABELS[reminder.repeat_type] || null;
   const items = Array.isArray(reminder.items) ? reminder.items : [];
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Swipe background actions */}
-      <div className="absolute inset-0 flex items-center justify-between px-4 rounded-xl text-xs font-bold pointer-events-none">
-        <div
-          className={`flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 transition-opacity ${
-            touchOffset > 20 ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <CheckCircle2 className="w-5 h-5" />
-          <span>{reminder.is_sent ? 'Відновити' : 'Виконано'}</span>
-        </div>
-        <div
-          className={`flex items-center gap-1.5 text-amber-600 dark:text-amber-400 transition-opacity ${
-            touchOffset < -20 ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <span>Відкласти 15 хв</span>
-          <Clock className="w-5 h-5" />
-        </div>
-      </div>
+      <ReminderSwipeIndicator touchOffset={touchOffset} isSent={reminder.is_sent} />
 
       {/* Card Content */}
       <div
@@ -218,46 +195,8 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
           </div>
         )}
 
-        {/* Subtasks / Checklist Items */}
-        {items.length > 0 && (
-          <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/60 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
-              <span className="flex items-center gap-1">
-                <ListTodo className="w-3 h-3 text-indigo-500" />
-                <span>Підзавдання</span>
-              </span>
-              <span>
-                {items.filter((i) => i.done).length}/{items.length}
-              </span>
-            </div>
-            {items.map((it) => (
-              <div
-                key={it.id}
-                onClick={(e) => handleToggleSubtask(e, it.id)}
-                className="flex items-center gap-2 text-xs py-0.5 cursor-pointer select-none group/item"
-              >
-                <div
-                  className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
-                    it.done
-                      ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : 'border-slate-300 dark:border-slate-600 group-hover/item:border-indigo-500'
-                  }`}
-                >
-                  {it.done && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                </div>
-                <span
-                  className={`transition-colors ${
-                    it.done
-                      ? 'line-through text-slate-400 dark:text-slate-500'
-                      : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {it.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Subtasks Checklist */}
+        <ReminderCardSubtasks items={items} onToggleSubtask={handleToggleSubtask} />
 
         {/* Status footer & toggle */}
         <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
@@ -305,4 +244,4 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
       </div>
     </div>
   );
-}
+});
