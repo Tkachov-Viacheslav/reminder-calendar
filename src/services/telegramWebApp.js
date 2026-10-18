@@ -15,6 +15,17 @@ export function initTelegramWebApp() {
     tg.expand();
     tg.setHeaderColor?.('#0f172a');
     tg.setBackgroundColor?.('#020617');
+
+    if (tg.themeParams && typeof document !== 'undefined') {
+      const root = document.documentElement;
+      const tp = tg.themeParams;
+      if (tp.bg_color) root.style.setProperty('--tg-theme-bg-color', tp.bg_color);
+      if (tp.text_color) root.style.setProperty('--tg-theme-text-color', tp.text_color);
+      if (tp.hint_color) root.style.setProperty('--tg-theme-hint-color', tp.hint_color);
+      if (tp.button_color) root.style.setProperty('--tg-theme-button-color', tp.button_color);
+      if (tp.button_text_color) root.style.setProperty('--tg-theme-button-text-color', tp.button_text_color);
+      if (tp.secondary_bg_color) root.style.setProperty('--tg-theme-secondary-bg-color', tp.secondary_bg_color);
+    }
   } catch {
     // Non-critical if theme configuration fails
   }

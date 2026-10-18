@@ -13,7 +13,7 @@ import { getCategoryMeta } from '../../utils/constants';
 import { formatTime } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 import { useSwipeAction } from '../../hooks/useSwipeAction';
-import { Badge } from '../ui';
+import { Badge, IconButton } from '../ui';
 import { ReminderSwipeIndicator } from './ReminderSwipeIndicator';
 import { ReminderCardSubtasks } from './ReminderCardSubtasks';
 
@@ -138,23 +138,23 @@ export const ReminderCard = React.memo(function ReminderCard({
             )}
           </div>
 
-          {/* Actions: Edit & Delete */}
+          {/* Actions: Edit & Delete with WCAG touch target */}
           {canEdit && (
-            <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
-              <button
+            <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity">
+              <IconButton
+                icon={<Pencil className="w-3.5 h-3.5" />}
                 onClick={handleEdit}
-                className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md transition-colors"
-                title="Редагувати нотатку"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-              <button
+                aria-label="Редагувати нотатку"
+                size="sm"
+                variant="ghost"
+              />
+              <IconButton
+                icon={<Trash2 className="w-3.5 h-3.5" />}
                 onClick={handleDelete}
-                className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
-                title="Видалити"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+                aria-label="Видалити нотатку"
+                size="sm"
+                variant="danger"
+              />
             </div>
           )}
         </div>

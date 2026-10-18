@@ -1,6 +1,9 @@
 export { Button } from './Button';
+export { IconButton } from './IconButton';
 export { Modal } from './Modal';
 export { Input } from './Input';
 export { Select } from './Select';
 export { Badge } from './Badge';
 export { Card } from './Card';
+export { Checkbox } from './Checkbox';
+export { Skeleton } from './Skeleton';
