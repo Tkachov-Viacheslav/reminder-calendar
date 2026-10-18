@@ -54,9 +54,15 @@ export function TelegramProvider({ children }) {
     triggerHaptic('light');
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dwzswscabsphwprptnos.supabase.co';
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (anonKey) {
+        headers['apikey'] = anonKey;
+        headers['Authorization'] = `Bearer ${anonKey}`;
+      }
       const res = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ code: String(code).trim() }),
       });
       const data = await res.json();
