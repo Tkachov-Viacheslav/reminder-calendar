@@ -328,8 +328,9 @@ export function TeamProvider({ children }) {
       if (!activeTeamId || !supabase) return;
       triggerHaptic('light');
       const cleanCat = String(category).toLowerCase().trim();
+      const isGeneral = !threadId || threadId === '0' || Number(threadId) === 0;
       try {
-        if (!threadId) {
+        if (isGeneral) {
           await supabase
             .from('team_category_topics')
             .delete()
