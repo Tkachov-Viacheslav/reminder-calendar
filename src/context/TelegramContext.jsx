@@ -35,11 +35,14 @@ export function TelegramProvider({ children }) {
     const userId = u.sub || u.id;
     if (!userId) return { success: false, error: authResult.error || 'ID користувача відсутній' };
 
+    const username = u.preferred_username || u.username || '';
+    const photoUrl = u.picture || u.photo_url || (username ? `https://t.me/i/userpic/320/${username}.jpg` : '');
+
     const formattedUser = {
       id: String(userId),
       first_name: u.name || u.first_name || '',
-      username: u.preferred_username || u.username || '',
-      photo_url: u.picture || u.photo_url || '',
+      username,
+      photo_url: photoUrl,
     };
     setUser(formattedUser);
     localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(formattedUser));
@@ -58,10 +61,13 @@ export function TelegramProvider({ children }) {
       });
       const data = await res.json();
       if (res.ok && data.ok && data.user) {
-        setUser(data.user);
-        localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(data.user));
+        const u = data.user;
+        const photoUrl = u.photo_url || (u.username ? `https://t.me/i/userpic/320/${u.username}.jpg` : '');
+        const formattedUser = { ...u, photo_url: photoUrl };
+        setUser(formattedUser);
+        localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(formattedUser));
         triggerHaptic('success');
-        return { success: true, user: data.user };
+        return { success: true, user: formattedUser };
       }
       triggerHaptic('error');
       return { success: false, error: data.error || 'Невірний код' };

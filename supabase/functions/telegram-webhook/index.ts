@@ -16,11 +16,14 @@ async function generateAndSaveCode(chatId: string | number, user: any) {
 
   await supabase.from('auth_codes').delete().eq('telegram_id', String(chatId));
 
+  const photoUrl = user?.username ? `https://t.me/i/userpic/320/${user.username}.jpg` : '';
+
   const { error } = await supabase.from('auth_codes').insert({
     code,
     telegram_id: String(chatId),
     first_name: user?.first_name || '',
     username: user?.username || '',
+    photo_url: photoUrl,
     expires_at: expiresAt,
   });
 
