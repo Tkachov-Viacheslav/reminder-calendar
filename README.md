@@ -1,102 +1,50 @@
-# 📅 Календар Нагадувань з Telegram Ботом (Netlify + Supabase + Telegram Mini App)
+# 📅 Календар Нагадувань з Telegram Ботом (Vercel + Supabase + Telegram Mini App)
 
 Сучасний інтерактивний веб-календар з плануванням нагадувань, які надсилаються безпосередньо у Telegram бот у визначений час.
 
-Працює як у звичайному браузері, так і у вигляді **Telegram Mini App** (всередині додатку Telegram).
+Працює як у звичайному браузері, так і у вигляді **Telegram Mini App** (всередині додатку Telegram) та як **PWA** на мобільних пристроях.
 
 ---
 
 ## 🚀 Основні можливості
 
-- **Інтерактивний календар:** перегляд місяця, вибір дня, швидкий перехід до поточної дати, категорії подій (Робота, Особисте, Навчання, Здоров’я, Інше).
-- **Підтримка Telegram Mini App (TMA):** автоматичне визначення користувача, імені та ID при відкритті всередині Telegram, вібровідгук (Haptic Feedback).
-- **Автономні серверні нагадування:** Netlify Scheduled Functions щохвилини перевіряють настання часу подій у базі Supabase і відправляють повідомлення через Telegram Bot API.
-- **Підтримка десктопного браузера:** можливість вказати свій Telegram Chat ID вручну та надіслати тестове сповіщення для перевірки.
-- **Локальний демо-режим:** сайт повноцінно працює через `localStorage` навіть до підключення бази даних Supabase.
+- **Інтерактивний календар:** перегляд місяця, вибір дня, швидкий перехід до поточної дати, категорії подій (Головне, Інше, Робота, Особисте, Навчання, Здоров’я та власні кольори).
+- **Підтримка Telegram Mini App (TMA):** автоматична авторизація користувача через Telegram SDK, вібровідгук (Haptic Feedback).
+- **Автономні серверні нагадування:** Supabase `pg_cron` щохвилини викликає Edge Function `check-reminders`, яка перевіряє настання часу подій у базі Supabase і відправляє сповіщення через Telegram Bot API без навантаження на хостинг.
+- **Ранковий дайджест:** щоранку о 09:00 (за Києвом) бот надсилає зведення запланованих справ на день.
+- **Швидкі команди бота:** `/today`, `/tomorrow`, `/week`, `/code` для миттєвого перегляду планів без відкриття календаря.
+- **Швидке створення через чат:** розумний парсинг повідомлень бота (наприклад, *«Завтра о 14:30 дзвінок»*).
+- **Підзавдання (чек-листи):** розбиття нагадувань на підпункти.
+- **Гнучкі повторення:** одноразово, щодня, щотижня, щомісяця або **щобудня (Пн–Пт)**.
+- **Свайпи на мобільному:** зручне перемикання місяців свайпом вліво/вправо.
+- **PWA (Progressive Web App):** можливість встановити додаток на головний екран смартфона з підтримкою офлайн-кешу.
 
 ---
 
 ## 🛠 Стек технологій
 
-- **Frontend:** React 19, Vite, Tailwind CSS v4, Lucide Icons
-- **Database:** Supabase (PostgreSQL)
-- **Functions & Hosting:** Netlify (Serverless & Scheduled Functions, Static Hosting)
+- **Frontend & Hosting:** React 19, Vite, Tailwind CSS v4, Lucide Icons, **Vercel**
+- **Database & Serverless Backend:** **Supabase** (PostgreSQL, Edge Functions Deno, `pg_cron`)
 - **Bot Integration:** Telegram Bot API & Telegram WebApp SDK
 
 ---
 
-## 📋 Покрокова інструкція з розгортання
+## 🌐 Посилання
 
-### 1. Створення Telegram Бота
-1. У Telegram відкрийте [@BotFather](https://t.me/BotFather) та надішліть команду `/newbot`.
-2. Вкажіть назву та username (наприклад, `my_calendar_bot`).
-3. Збережіть отриманий токен (наприклад, `7123456789:AAFxxx...`).
-4. *(Опціонально для Mini App)* Налаштуйте кнопку меню:
-   - Надішліть `/setmenubutton` → оберіть вашого бота → вкажіть URL сайту: `https://reminder-calendar-tg.netlify.app`.
+- **Сайт / Mini App:** `https://reminder-calendar-seven.vercel.app`
+- **Telegram бот:** [@reminderveter_bot](https://t.me/reminderveter_bot)
 
 ---
 
-### 2. Створення бази даних у Supabase
-1. Зареєструйтесь на [supabase.com](https://supabase.com) і створіть новий проєкт.
-2. Перейдіть у меню **SQL Editor** зліва.
-3. Скопіюйте вміст файлу `supabase-schema.sql` (або з вікна інструкцій на сайті), вставте його в редактор і натисніть **Run**:
-   ```sql
-   CREATE TABLE IF NOT EXISTS public.reminders (
-       id TEXT PRIMARY KEY,
-       user_id TEXT NOT NULL,
-       title TEXT NOT NULL,
-       description TEXT DEFAULT '',
-       category TEXT DEFAULT 'personal',
-       remind_at TIMESTAMP WITH TIME ZONE NOT NULL,
-       is_sent BOOLEAN DEFAULT false,
-       created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-   );
+## 📋 Архітектура проекту
 
-   CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON public.reminders (remind_at, is_sent);
-   CREATE INDEX IF NOT EXISTS idx_reminders_user_id ON public.reminders (user_id);
+1. **Frontend (Vercel):**
+   - Розгорнуто на платформі Vercel: `reminder-calendar`
+   - Підключений GitHub репозиторій для автоматичного CI/CD деплою при кожному `git push` у гілку `main`.
 
-   ALTER TABLE public.reminders ENABLE ROW LEVEL SECURITY;
-
-   CREATE POLICY "Allow public select" ON public.reminders FOR SELECT USING (true);
-   CREATE POLICY "Allow public insert" ON public.reminders FOR INSERT WITH CHECK (true);
-   CREATE POLICY "Allow public update" ON public.reminders FOR UPDATE USING (true) WITH CHECK (true);
-   CREATE POLICY "Allow public delete" ON public.reminders FOR DELETE USING (true);
-   ```
-4. У **Project Settings -> API** скопіюйте:
-   - **Project URL**
-   - **anon public key**
-   - **service_role secret key**
-
----
-
-### 3. Завантаження на GitHub
-Ініціалізуйте Git і завантажте проєкт у свій репозиторій на GitHub:
-```bash
-git init
-git add .
-git commit -m "Initial commit: Telegram reminder calendar"
-git branch -M main
-git remote add origin https://github.com/ВАШ_КОРИСТУВАЧ/ВАШ_РЕПОЗИТОРІЙ.git
-git push -u origin main
-```
-
----
-
-### 4. Хостинг на Netlify
-1. Перейдіть на [app.netlify.com](https://app.netlify.com/) і натисніть **"Add new site" -> "Import an existing project"**.
-2. Виберіть **GitHub** і вкажіть створений репозиторій.
-3. Параметри збірки Netlify підтягне автоматично з `netlify.toml`:
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist`
-   - **Functions directory:** `netlify/functions`
-4. Перейдіть до **Site configuration -> Environment variables** і додайте 4 змінні:
-   - `VITE_SUPABASE_URL` = ваш URL проєкту Supabase
-   - `VITE_SUPABASE_ANON_KEY` = ваш anon public ключ
-   - `SUPABASE_SERVICE_ROLE_KEY` = ваш service_role secret ключ
-   - `TELEGRAM_BOT_TOKEN` = ваш токен бота від @BotFather
-5. Натисніть **Deploy site**.
-
-Netlify автоматично щохвилини запускатиме серверний розклад (`check-reminders.mjs`), який перевірятиме базу та надсилатиме повідомлення користувачам у Telegram!
+2. **Supabase Edge Functions & Cron:**
+   - `check-reminders`: перевіряє заплановані події щохвилини через внутрішній розклад `pg_cron` та надсилає сповіщення з кнопками («✅ Виконано», «💤 Відкласти 15 хв»). О 09:00 надсилає ранковий дайджест.
+   - `telegram-webhook`: обробляє команди (`/today`, `/tomorrow`, `/week`, `/code`), швидке додавання через текстові повідомлення та inline-кнопки.
 
 ---
 
