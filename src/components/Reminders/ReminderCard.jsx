@@ -270,16 +270,21 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
                 ? 'text-amber-600 dark:text-amber-400 hover:text-amber-700'
                 : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700'
             }`}
+            title={
+              reminder.is_sent
+                ? 'Натисніть, щоб повернути в активні'
+                : 'Натисніть, щоб позначити як виконане'
+            }
           >
             {reminder.is_sent ? (
               <>
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Надіслано в TG</span>
+                <span>Виконано</span>
               </>
             ) : isPast ? (
               <>
                 <AlertCircle className="w-3.5 h-3.5 animate-pulse" />
-                <span>Очікує розкладу</span>
+                <span>Час настав</span>
               </>
             ) : (
               <>
@@ -290,7 +295,11 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
           </button>
 
           <span className="text-[11px] text-slate-400 dark:text-slate-500">
-            {reminder.is_sent ? 'Виконано' : 'Активне'}
+            {reminder.is_sent
+              ? 'Завершено'
+              : isPast
+              ? 'Очікує відправки'
+              : 'Активне'}
           </span>
         </div>
       </div>
