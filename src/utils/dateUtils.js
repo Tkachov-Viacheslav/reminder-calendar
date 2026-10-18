@@ -6,7 +6,9 @@ export const MONTH_NAMES_UA = [
 export const WEEKDAY_NAMES_UA = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
 export function toISODateString(date) {
+  if (!date) return '';
   const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -17,6 +19,7 @@ export function isSameDay(d1, d2) {
   if (!d1 || !d2) return false;
   const date1 = new Date(d1);
   const date2 = new Date(d2);
+  if (isNaN(date1.getTime()) || isNaN(date2.getTime())) return false;
   return (
     date1.getFullYear() === date2.getFullYear() &&
     date1.getMonth() === date2.getMonth() &&
@@ -29,9 +32,11 @@ export function isToday(date) {
 }
 
 export function formatDateUkrainian(date) {
+  if (!date) return '';
   const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   const day = d.getDate();
-  const monthName = MONTH_NAMES_UA[d.getMonth()].toLowerCase();
+  const monthName = MONTH_NAMES_UA[d.getMonth()]?.toLowerCase() || '';
   const year = d.getFullYear();
   return `${day} ${monthName} ${year}`;
 }
@@ -39,6 +44,7 @@ export function formatDateUkrainian(date) {
 export function formatTime(isoString) {
   if (!isoString) return '';
   const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
   return `${hours}:${minutes}`;

@@ -1,17 +1,38 @@
-import React from 'react';
-import { WEEKDAY_NAMES_UA, getMonthMatrix, isSameDay, isToday } from '../../utils/dateUtils';
+import React, { useMemo } from 'react';
+import {
+  WEEKDAY_NAMES_UA,
+  getMonthMatrix,
+  isSameDay,
+  isToday,
+  toISODateString,
+} from '../../utils/dateUtils';
 import { getCategoryMeta } from '../../utils/constants';
 import { useTelegram } from '../../context/TelegramContext';
 
-export function MonthView({ viewDate, selectedDate, onSelectDate, reminders }) {
+export const MonthView = React.memo(function MonthView({
+  viewDate,
+  selectedDate,
+  onSelectDate,
+  reminders,
+}) {
   const { triggerHaptic } = useTelegram();
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
-  const days = getMonthMatrix(year, month);
+  const days = useMemo(() => getMonthMatrix(year, month), [year, month]);
 
-  const getRemindersForDay = (date) => {
-    return reminders.filter((rem) => isSameDay(rem.remind_at, date));
-  };
+  const remindersByDate = useMemo(() => {
+    const map = new Map();
+    if (!Array.isArray(reminders)) return map;
+    for (const rem of reminders) {
+      if (!rem?.remind_at) continue;
+      const key = toISODateString(rem.remind_at);
+      if (!key) continue;
+      const list = map.get(key) || [];
+      list.push(rem);
+      map.set(key, list);
+    }
+    return map;
+  }, [reminders]);
 
   const handleDayClick = (date) => {
     triggerHaptic('light');
@@ -37,7 +58,8 @@ export function MonthView({ viewDate, selectedDate, onSelectDate, reminders }) {
       {/* Days grid */}
       <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {days.map((item, index) => {
-          const dayReminders = getRemindersForDay(item.date);
+          const dateKey = toISODateString(item.date);
+          const dayReminders = remindersByDate.get(dateKey) || [];
           const isSelected = isSameDay(item.date, selectedDate);
           const today = isToday(item.date);
 
@@ -96,4 +118,4 @@ export function MonthView({ viewDate, selectedDate, onSelectDate, reminders }) {
       </div>
     </div>
   );
-}
+});

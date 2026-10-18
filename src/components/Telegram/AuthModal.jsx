@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { KeyRound, ExternalLink, LogOut, Bot, User, ShieldCheck } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
+import { useToast } from '../../context/ToastContext';
 import { Modal, Button } from '../ui';
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'reminderveter_bot';
 const CLIENT_ID = import.meta.env.VITE_TELEGRAM_CLIENT_ID || '8785054597';
 
 export function AuthModal({ isOpen, onClose }) {
-  const { isInTelegram, user, isAuthenticated, loginWithCode, loginWithTelegram, logout } = useTelegram();
+  const { isInTelegram, user, isAuthenticated, loginWithCode, loginWithTelegram, logout } =
+    useTelegram();
+  const { showToast } = useToast();
   const [code, setCode] = useState('');
   const [codeLoading, setCodeLoading] = useState(false);
   const [tgLoading, setTgLoading] = useState(false);
@@ -16,13 +19,22 @@ export function AuthModal({ isOpen, onClose }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (!window.Telegram?.Login) {
+    if (!window.Telegram?.Login && !document.getElementById('telegram-login-script')) {
       const script = document.createElement('script');
+      script.id = 'telegram-login-script';
       script.src = 'https://oauth.telegram.org/js/telegram-login.js';
       script.async = true;
       document.body.appendChild(script);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setCode('');
+      setError('');
+      setShowCodeInput(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -85,6 +97,12 @@ export function AuthModal({ isOpen, onClose }) {
     }
   };
 
+  const handleLogout = () => {
+    logout();
+    showToast('Ви вийшли з акаунта', 'info');
+    onClose();
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -129,7 +147,7 @@ export function AuthModal({ isOpen, onClose }) {
               {!isInTelegram && (
                 <Button
                   variant="ghost"
-                  onClick={logout}
+                  onClick={handleLogout}
                   icon={<LogOut className="w-3.5 h-3.5" />}
                   className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                 >

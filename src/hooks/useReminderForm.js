@@ -128,10 +128,28 @@ export function useReminderForm({ isOpen, editingReminder, initialDate, onSave, 
       return;
     }
 
+    if (!dateStr || !timeStr) {
+      setError('Будь ласка, вкажіть дату та час');
+      triggerHaptic('error');
+      return;
+    }
+
     const [year, month, day] = dateStr.split('-').map(Number);
     const [hours, minutes] = timeStr.split(':').map(Number);
     const eventDate = new Date(year, month - 1, day, hours, minutes);
-    const remindAtDate = new Date(eventDate.getTime() - Number(remindBefore) * 60 * 1000);
+
+    if (isNaN(eventDate.getTime())) {
+      setError('Будь ласка, оберіть коректну дату та час');
+      triggerHaptic('error');
+      return;
+    }
+
+    const remindAtDate = new Date(eventDate.getTime() - Number(remindBefore || 0) * 60 * 1000);
+    if (isNaN(remindAtDate.getTime())) {
+      setError('Некоректний розрахунок часу нагадування');
+      triggerHaptic('error');
+      return;
+    }
 
     triggerHaptic('success');
     onSave({
@@ -140,7 +158,7 @@ export function useReminderForm({ isOpen, editingReminder, initialDate, onSave, 
       category,
       remind_at: remindAtDate.toISOString(),
       repeat_type: repeatType,
-      remind_before: Number(remindBefore),
+      remind_before: Number(remindBefore || 0),
       items,
       thread_id: threadId ? Number(threadId) : null,
       tagged_members: taggedMembers,

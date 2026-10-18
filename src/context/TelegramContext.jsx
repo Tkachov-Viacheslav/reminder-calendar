@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { LOCAL_STORAGE_USER } from '../utils/constants';
+import { LOCAL_STORAGE_USER, LOCAL_STORAGE_ACTIVE_TEAM } from '../utils/constants';
 
 const TelegramContext = createContext(null);
 
@@ -87,6 +87,7 @@ export function TelegramProvider({ children }) {
     triggerHaptic('medium');
     setUser(null);
     localStorage.removeItem(LOCAL_STORAGE_USER);
+    localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
   };
 
   const setClosingConfirmation = useCallback((enabled) => {
