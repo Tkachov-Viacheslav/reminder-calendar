@@ -28,6 +28,8 @@ export function AuthModal({ isOpen, onClose }) {
       script.setAttribute('data-telegram-login', BOT_USERNAME);
       script.setAttribute('data-size', 'large');
       script.setAttribute('data-radius', '12');
+      script.setAttribute('data-lang', 'uk');
+      script.setAttribute('data-userpic', 'true');
       script.setAttribute('data-request-access', 'write');
       script.setAttribute('data-onauth', 'onTelegramAuth(user)');
       script.async = true;
