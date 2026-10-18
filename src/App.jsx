@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TelegramProvider } from './context/TelegramContext';
+import { TeamProvider, useTeam } from './context/TeamContext';
 import { ReminderProvider, useReminders } from './context/ReminderContext';
 import { Header } from './components/Header';
 import { CalendarHeader } from './components/Calendar/CalendarHeader';
@@ -7,8 +8,9 @@ import { MonthView } from './components/Calendar/MonthView';
 import { ReminderList } from './components/Reminders/ReminderList';
 import { ReminderModal } from './components/Reminders/ReminderModal';
 import { AuthModal } from './components/Telegram/AuthModal';
+import { TeamSettingsModal } from './components/Team/TeamSettingsModal';
 import { isSupabaseConfigured } from './services/supabase';
-import { Info } from 'lucide-react';
+import { Info, Users } from 'lucide-react';
 
 function CalendarContent() {
   const {
@@ -20,9 +22,11 @@ function CalendarContent() {
     addReminder,
     updateReminder,
   } = useReminders();
+  const { currentTeam, canEdit } = useTeam();
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isTeamSettingsOpen, setIsTeamSettingsOpen] = useState(false);
 
   const handleOpenNewReminder = () => {
     setEditingReminder(null);
@@ -69,6 +73,7 @@ function CalendarContent() {
       <Header
         onOpenNewReminder={handleOpenNewReminder}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenTeamSettings={() => setIsTeamSettingsOpen(true)}
       />
 
       {/* Main Container */}
@@ -82,6 +87,24 @@ function CalendarContent() {
                 <strong>Локальний демо-режим:</strong> Події зберігаються у браузері.
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Active Team Workspace Banner */}
+        {currentTeam && (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-violet-50/90 dark:bg-violet-950/50 border border-violet-200/80 dark:border-violet-900/60 text-xs">
+            <div className="flex items-center gap-2 text-violet-950 dark:text-violet-200">
+              <Users className="w-4 h-4 text-violet-500 shrink-0" />
+              <span>
+                Командний календар: <strong>{currentTeam.title}</strong>
+                {!canEdit && ' (Режим перегляду)'}
+              </span>
+            </div>
+            {currentTeam.is_forum && (
+              <span className="text-[11px] font-semibold text-violet-600 dark:text-violet-400">
+                💬 Форум із темами
+              </span>
+            )}
           </div>
         )}
 
@@ -127,6 +150,10 @@ function CalendarContent() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
       />
+      <TeamSettingsModal
+        isOpen={isTeamSettingsOpen}
+        onClose={() => setIsTeamSettingsOpen(false)}
+      />
     </div>
   );
 }
@@ -134,9 +161,11 @@ function CalendarContent() {
 export default function App() {
   return (
     <TelegramProvider>
-      <ReminderProvider>
-        <CalendarContent />
-      </ReminderProvider>
+      <TeamProvider>
+        <ReminderProvider>
+          <CalendarContent />
+        </ReminderProvider>
+      </TeamProvider>
     </TelegramProvider>
   );
 }

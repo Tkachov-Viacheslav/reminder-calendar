@@ -1,17 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Tag, FileText, Check, Pencil, Plus, Bell, Repeat, ListTodo } from 'lucide-react';
+import {
+  X,
+  Calendar,
+  Clock,
+  Tag,
+  FileText,
+  Check,
+  Pencil,
+  Plus,
+  Bell,
+  Repeat,
+  ListTodo,
+  Users,
+  Hash,
+  MessageSquare,
+} from 'lucide-react';
 import {
   SYSTEM_CATEGORIES,
   DEFAULT_CATEGORY,
   getCategoryMeta,
-  LOCAL_STORAGE_CUSTOM_CATEGORIES,
 } from '../../utils/constants';
 import { toISODateString } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
+import { useTeam } from '../../context/TeamContext';
 import { useReminders } from '../../context/ReminderContext';
 
 export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingReminder }) {
   const { triggerHaptic } = useTelegram();
+  const { currentTeam, teamMembers, teamTopics } = useTeam();
   const { customCategories, addCustomCategory, deleteCustomCategory } = useReminders();
 
   const getDefaultTime = () => {
@@ -31,10 +47,53 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
   const [remindBefore, setRemindBefore] = useState(0);
   const [items, setItems] = useState([]);
   const [newItemText, setNewItemText] = useState('');
+  const [threadId, setThreadId] = useState(null);
+  const [taggedMembers, setTaggedMembers] = useState([]);
+  const [customTagInput, setCustomTagInput] = useState('');
   const [error, setError] = useState('');
 
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
+
+  const handleToggleMemberTag = (member) => {
+    const memberId = String(member.telegram_id);
+    const isTagged = taggedMembers.some((m) => m.id === memberId);
+    if (isTagged) {
+      setTaggedMembers((prev) => prev.filter((m) => m.id !== memberId));
+    } else {
+      setTaggedMembers((prev) => [
+        ...prev,
+        {
+          id: memberId,
+          name: member.first_name || '',
+          username: member.username || '',
+        },
+      ]);
+    }
+    triggerHaptic('light');
+  };
+
+  const handleRemoveTagged = (indexToRemove) => {
+    setTaggedMembers((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    triggerHaptic('light');
+  };
+
+  const handleAddCustomTag = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = customTagInput.trim();
+    if (!trimmed) return;
+    const cleanUsername = trimmed.replace(/^@/, '');
+    setTaggedMembers((prev) => [
+      ...prev,
+      {
+        id: '',
+        name: trimmed,
+        username: cleanUsername,
+      },
+    ]);
+    setCustomTagInput('');
+    triggerHaptic('light');
+  };
 
   const handleAddItem = (e) => {
     if (e) e.preventDefault();
@@ -100,6 +159,11 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setCategory(editingReminder.category || DEFAULT_CATEGORY);
       setRepeatType(editingReminder.repeat_type || 'none');
       setItems(Array.isArray(editingReminder.items) ? editingReminder.items : []);
+      setThreadId(editingReminder.thread_id || null);
+      setTaggedMembers(
+        Array.isArray(editingReminder.tagged_members) ? editingReminder.tagged_members : []
+      );
+      setCustomTagInput('');
       const remindBeforeVal = editingReminder.remind_before || 0;
       setRemindBefore(remindBeforeVal);
       const remDate = new Date(editingReminder.remind_at);
@@ -118,6 +182,9 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       setRemindBefore(0);
       setItems([]);
       setNewItemText('');
+      setThreadId(null);
+      setTaggedMembers([]);
+      setCustomTagInput('');
       setDateStr(toISODateString(initialDate || new Date()));
       setTimeStr(getDefaultTime());
     }
@@ -148,6 +215,8 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
       repeat_type: repeatType,
       remind_before: Number(remindBefore),
       items,
+      thread_id: threadId ? Number(threadId) : null,
+      tagged_members: taggedMembers,
       ...(editingReminder ? { is_sent: false } : {}),
     });
 
@@ -461,6 +530,107 @@ export function ReminderModal({ isOpen, onClose, onSave, initialDate, editingRem
               </button>
             </div>
           </div>
+
+          {/* Team Fields: Topic & Tagged Members */}
+          {currentTeam && (
+            <div className="p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200/60 dark:border-violet-900/40 space-y-3">
+              {/* Forum Topic Selector */}
+              <div>
+                <label className="text-xs font-semibold text-violet-950 dark:text-violet-200 flex items-center gap-1.5 mb-1">
+                  <Hash className="w-3.5 h-3.5 text-violet-500" />
+                  <span>Тема форуму (куди надіслати)</span>
+                </label>
+                <select
+                  value={threadId || 0}
+                  onChange={(e) => setThreadId(Number(e.target.value) || null)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <option value="0">За замовчуванням (з прив'язки категорії)</option>
+                  {teamTopics.map((topic) => (
+                    <option key={topic.id} value={topic.thread_id}>
+                      #{topic.name || `Тема ${topic.thread_id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tagged Members */}
+              <div>
+                <label className="text-xs font-semibold text-violet-950 dark:text-violet-200 flex items-center gap-1.5 mb-1.5">
+                  <Users className="w-3.5 h-3.5 text-violet-500" />
+                  <span>Відповідальні (кого тегнути ботом)</span>
+                </label>
+
+                {/* Selected chips */}
+                {taggedMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {taggedMembers.map((tm, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200 text-xs font-medium"
+                      >
+                        <span>{tm.username ? `@${tm.username}` : tm.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTagged(idx)}
+                          className="hover:text-rose-500"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Autocomplete from known chat members */}
+                {teamMembers.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2 max-h-20 overflow-y-auto">
+                    {teamMembers.map((m) => {
+                      const isSelected = taggedMembers.some((t) => t.id === String(m.telegram_id));
+                      return (
+                        <button
+                          type="button"
+                          key={m.id}
+                          onClick={() => handleToggleMemberTag(m)}
+                          className={`px-2 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${
+                            isSelected
+                              ? 'bg-violet-600 text-white border-violet-600'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-violet-400'
+                          }`}
+                        >
+                          {m.first_name || (m.username ? `@${m.username}` : 'Учасник')}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Custom tag input */}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={customTagInput}
+                    onChange={(e) => setCustomTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomTag();
+                      }
+                    }}
+                    placeholder="@username або ім'я..."
+                    className="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800 rounded-lg text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCustomTag}
+                    className="px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-semibold"
+                  >
+                    + Тег
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Description */}
           <div>

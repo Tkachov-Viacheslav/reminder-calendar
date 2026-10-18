@@ -15,7 +15,7 @@ import { getCategoryMeta } from '../../utils/constants';
 import { formatTime } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 
-export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdate }) {
+export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdate, canEdit = true }) {
   const { triggerHaptic } = useTelegram();
   const category = getCategoryMeta(reminder.category);
   const isPast = new Date(reminder.remind_at) < new Date();
@@ -56,25 +56,28 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
 
   const handleEdit = (e) => {
     e.stopPropagation();
+    if (!canEdit) return;
     triggerHaptic('light');
     if (onEdit) onEdit(reminder);
   };
 
   const handleDelete = (e) => {
     e.stopPropagation();
+    if (!canEdit) return;
     triggerHaptic('medium');
     onDelete(reminder.id);
   };
 
   const handleToggle = (e) => {
     e.stopPropagation();
+    if (!canEdit) return;
     triggerHaptic('light');
     onToggleSent(reminder.id, !reminder.is_sent);
   };
 
   const handleToggleSubtask = (e, itemId) => {
     e.stopPropagation();
-    if (!onUpdate) return;
+    if (!onUpdate || !canEdit) return;
     const currentItems = Array.isArray(reminder.items) ? reminder.items : [];
     const updated = currentItems.map((it) =>
       it.id === itemId ? { ...it, done: !it.done } : it
@@ -158,22 +161,24 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
           </div>
 
           {/* Actions: Edit & Delete */}
-          <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={handleEdit}
-              className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md transition-colors"
-              title="Редагувати нотатку"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={handleDelete}
-              className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
-              title="Видалити"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={handleEdit}
+                className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 p-1 rounded-md transition-colors"
+                title="Редагувати нотатку"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleDelete}
+                className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
+                title="Видалити"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Title & Description */}
@@ -193,6 +198,27 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
             </p>
           )}
         </div>
+
+        {/* Team Meta: Author & Tagged Members */}
+        {((Array.isArray(reminder.tagged_members) && reminder.tagged_members.length > 0) ||
+          reminder.created_by_name) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+            {reminder.created_by_name && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+                👤 {reminder.created_by_name}
+              </span>
+            )}
+            {Array.isArray(reminder.tagged_members) &&
+              reminder.tagged_members.map((m, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200/50 dark:border-violet-800/40 font-medium"
+                >
+                  @{m.username || m.name}
+                </span>
+              ))}
+          </div>
+        )}
 
         {/* Subtasks / Checklist Items */}
         {items.length > 0 && (

@@ -58,6 +58,192 @@ async function sendBotMessage(botToken: string, chatId: string | number, text: s
   });
 }
 
+async function sendGroupMessage(
+  botToken: string,
+  chatId: string | number,
+  text: string,
+  threadId?: number | null,
+  extraRows: any[] = []
+) {
+  const body: any = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+  };
+  if (threadId && Number(threadId) > 0) {
+    body.message_thread_id = Number(threadId);
+  }
+  if (extraRows.length > 0) {
+    body.reply_markup = { inline_keyboard: extraRows };
+  }
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+async function ensureTeamExists(supabase: any, chat: any, createdBy?: string | number) {
+  const teamId = `team_${chat.id}`;
+  const isForum = Boolean(chat.is_forum);
+  const { data: existing } = await supabase
+    .from('teams')
+    .select('id, is_forum, title')
+    .eq('id', teamId)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase.from('teams').insert({
+      id: teamId,
+      telegram_chat_id: String(chat.id),
+      title: chat.title || 'Команда',
+      is_forum: isForum,
+      created_by: createdBy ? String(createdBy) : '',
+      default_role: 'editor',
+    });
+  } else if (existing.is_forum !== isForum || existing.title !== (chat.title || 'Команда')) {
+    await supabase
+      .from('teams')
+      .update({ is_forum: isForum, title: chat.title || 'Команда' })
+      .eq('id', teamId);
+  }
+  return teamId;
+}
+
+async function recordTeamMember(supabase: any, teamId: string, user: any, forceAdmin = false) {
+  if (!user || !user.id) return;
+  const userId = String(user.id);
+  const { data: existing } = await supabase
+    .from('team_members')
+    .select('id, role')
+    .eq('team_id', teamId)
+    .eq('telegram_id', userId)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabase.from('team_members').insert({
+      team_id: teamId,
+      telegram_id: userId,
+      first_name: user.first_name || '',
+      username: user.username || '',
+      role: forceAdmin ? 'admin' : 'editor',
+    });
+  } else {
+    const updates: any = {
+      first_name: user.first_name || '',
+      username: user.username || '',
+      updated_at: new Date().toISOString(),
+    };
+    if (forceAdmin && existing.role !== 'admin') {
+      updates.role = 'admin';
+    }
+    await supabase
+      .from('team_members')
+      .update(updates)
+      .eq('team_id', teamId)
+      .eq('telegram_id', userId);
+  }
+}
+
+async function syncChatAdmins(supabase: any, botToken: string, chat: any) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/getChatAdministrators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chat.id }),
+    });
+    const data = await res.json();
+    if (data.ok && Array.isArray(data.result)) {
+      const teamId = `team_${chat.id}`;
+      for (const admin of data.result) {
+        if (admin.user && !admin.user.is_bot) {
+          await recordTeamMember(supabase, teamId, admin.user, true);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to sync chat admins:', err);
+  }
+}
+
+async function recordTopic(supabase: any, teamId: string, threadId: number, name: string) {
+  if (!threadId) return;
+  await supabase.from('team_topics').upsert(
+    {
+      team_id: teamId,
+      thread_id: threadId,
+      name: name || `Тема #${threadId}`,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'team_id,thread_id' }
+  );
+}
+
+async function handleBindCommand(
+  chatId: string | number,
+  threadId: number | undefined,
+  text: string,
+  user: any,
+  botToken: string
+) {
+  const parts = text.split(/\s+/);
+  const categoryRaw = parts[1]?.trim();
+  const teamId = `team_${chatId}`;
+  const supabase = getSupabaseClient();
+
+  if (!categoryRaw) {
+    const helpMsg =
+      `💡 <b>Прив'язка теми до категорії нагадувань:</b>\n\n` +
+      `Введіть <code>/bind назва_категорії</code> у потрібній гілці чату.\n\n` +
+      `Наприклад: <code>/bind робота</code> або <code>/bind навчання</code>.\n` +
+      `Після цього всі нагадування з цією категорією надсилатимуться сюди!`;
+    await sendGroupMessage(botToken, chatId, helpMsg, threadId);
+    return;
+  }
+
+  const { data: member } = await supabase
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('telegram_id', String(user?.id))
+    .maybeSingle();
+
+  if (member && member.role === 'blocked') return;
+
+  const cleanCategory = categoryRaw.toLowerCase().replace('#', '');
+  await supabase.from('team_category_topics').upsert(
+    {
+      team_id: teamId,
+      category: cleanCategory,
+      thread_id: threadId || 0,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'team_id,category' }
+  );
+
+  const targetTopicText = threadId ? 'цю тему' : 'головний чат';
+  const reply =
+    `📌 Категорію <b>#${cleanCategory}</b> успішно прив'язано до ${targetTopicText}!\n\n` +
+    `Тепер усі командні нагадування цієї категорії надсилатимуться сюди.`;
+  await sendGroupMessage(botToken, chatId, reply, threadId);
+}
+
+async function handleTeamCommand(
+  chatId: string | number,
+  threadId: number | undefined,
+  botToken: string,
+  siteUrl: string
+) {
+  const teamId = `team_${chatId}`;
+  const reply =
+    `👥 <b>Командний календар</b>\n\n` +
+    `Натисніть кнопку нижче, щоб відкрити спільний розклад цієї команди:`;
+  const keyboard = [
+    [{ text: '📅 Відкрити командний календар', url: `${siteUrl}/?team=${teamId}` }],
+  ];
+  await sendGroupMessage(botToken, chatId, reply, threadId, keyboard);
+}
+
 async function sendAuthCode(chatId: string | number, user: any, botToken: string, siteUrl: string) {
   const code = await generateAndSaveCode(chatId, user);
   if (!code) {
@@ -491,13 +677,86 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (update?.my_chat_member) {
+      const mcm = update.my_chat_member;
+      const chat = mcm.chat;
+      const isGroup = chat?.type === 'group' || chat?.type === 'supergroup';
+      if (isGroup) {
+        const newStatus = mcm.new_chat_member?.status;
+        if (newStatus === 'member' || newStatus === 'administrator') {
+          const supabase = getSupabaseClient();
+          const teamId = await ensureTeamExists(supabase, chat, mcm.from?.id);
+          await syncChatAdmins(supabase, BOT_TOKEN, chat);
+          const title = escapeHtml(chat.title || 'Команда');
+          const welcome =
+            `👋 <b>Командний календар активовано для чату «${title}»!</b>\n\n` +
+            `📅 Усі учасники чату можуть переглядати спільні нагадування.\n` +
+            `⚙️ <b>Корисні команди:</b>\n` +
+            `• <code>/bind назва_категорії</code> — прив'язати категорію до теми\n` +
+            `• <code>/team</code> — відкрити командний календар`;
+          const keyboard = [
+            [{ text: '📅 Відкрити командний календар', url: `${SITE_URL}/?team=${teamId}` }],
+          ];
+          await sendGroupMessage(BOT_TOKEN, chat.id, welcome, undefined, keyboard);
+        }
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const message = update?.message;
     if (!message || !message.chat) return new Response('OK', { status: 200 });
 
     const chatId = message.chat.id;
+    const chatType = message.chat.type;
+    const isGroupChat = chatType === 'group' || chatType === 'supergroup';
     const text = (message.text || '').trim();
     const lowerText = text.toLowerCase();
+    const threadId = message.message_thread_id;
 
+    if (isGroupChat) {
+      const supabase = getSupabaseClient();
+      const teamId = await ensureTeamExists(supabase, message.chat, message.from?.id);
+
+      if (message.from && !message.from.is_bot) {
+        await recordTeamMember(supabase, teamId, message.from);
+      }
+
+      if (message.forum_topic_created) {
+        await recordTopic(supabase, teamId, threadId, message.forum_topic_created.name);
+      } else if (threadId) {
+        await recordTopic(supabase, teamId, threadId, '');
+      }
+
+      if (lowerText.startsWith('/bind')) {
+        await handleBindCommand(chatId, threadId, text, message.from, BOT_TOKEN);
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (
+        lowerText.startsWith('/team') ||
+        lowerText.startsWith('/calendar') ||
+        lowerText.startsWith('/календар')
+      ) {
+        await handleTeamCommand(chatId, threadId, BOT_TOKEN, SITE_URL);
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // --- Private Chat Commands ---
     // 1. Auth code requests
     const isCodeRequest =
       lowerText.startsWith('/code') ||

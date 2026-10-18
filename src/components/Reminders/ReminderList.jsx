@@ -4,10 +4,12 @@ import { ReminderCard } from './ReminderCard';
 import { formatDateUkrainian, isSameDay } from '../../utils/dateUtils';
 import { SYSTEM_CATEGORIES } from '../../utils/constants';
 import { useReminders } from '../../context/ReminderContext';
+import { useTeam } from '../../context/TeamContext';
 
 export function ReminderList({ onOpenNewReminder, onEditReminder }) {
   const { reminders, customCategories, selectedDate, updateReminder, deleteReminder } =
     useReminders();
+  const { canEdit } = useTeam();
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -162,6 +164,7 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
             <ReminderCard
               key={rem.id}
               reminder={rem}
+              canEdit={canEdit}
               onToggleSent={handleToggleSent}
               onDelete={deleteReminder}
               onEdit={onEditReminder}

@@ -97,7 +97,14 @@ export function TelegramProvider({ children }) {
       tg.ready();
       tg.expand();
       const tgU = tg.initDataUnsafe.user;
-      const tmaUser = { id: String(tgU.id), first_name: tgU.first_name, username: tgU.username };
+      const photoUrl =
+        tgU.photo_url || (tgU.username ? `https://t.me/i/userpic/320/${tgU.username}.jpg` : '');
+      const tmaUser = {
+        id: String(tgU.id),
+        first_name: tgU.first_name,
+        username: tgU.username,
+        photo_url: photoUrl,
+      };
       setUser(tmaUser);
       localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(tmaUser));
       return;

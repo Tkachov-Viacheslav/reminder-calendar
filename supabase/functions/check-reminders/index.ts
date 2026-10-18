@@ -155,47 +155,160 @@ async function sendTelegramAlert(botToken: string, chatId: string, reminder: any
   return response.ok;
 }
 
-async function handleMorningDigests(supabase: any, botToken: string, siteUrl: string) {
-  const kyiv = getKyivDateTime();
-  if (kyiv.hour !== 9 || kyiv.minute > 10) return;
+async function sendPmAlert(
+  botToken: string,
+  chatId: string,
+  text: string,
+  siteUrl: string,
+  teamId: string
+) {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '📅 Відкрити командний календар', url: `${siteUrl}/?team=${teamId}` }],
+          ],
+        },
+      }),
+    });
+  } catch {
+    // Ignore error if user has not started bot in private messages
+  }
+}
 
-  const todayStr = kyiv.dateStr;
-  const { data: usersData } = await supabase
-    .from('reminders')
-    .select('user_id')
-    .neq('user_id', 'guest');
+async function sendTeamReminderAlert(
+  supabase: any,
+  botToken: string,
+  siteUrl: string,
+  reminder: any
+): Promise<boolean> {
+  const { data: team } = await supabase
+    .from('teams')
+    .select('*')
+    .eq('id', reminder.team_id)
+    .maybeSingle();
 
-  if (!usersData || usersData.length === 0) return;
-  const userIds: string[] = Array.from(new Set(usersData.map((u: any) => u.user_id).filter(Boolean)));
+  if (!team || !team.telegram_chat_id) return false;
 
-  const [y, m, d] = todayStr.split('-').map(Number);
-  const startOfDay = kyivToUtc(y, m, d, 0, 0).toISOString();
-  const endOfDay = kyivToUtc(y, m, d, 23, 59).toISOString();
+  const timeFormatted = new Date(reminder.remind_at).toLocaleTimeString('uk-UA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Kyiv',
+  });
+  const categoryTag = formatCategoryTag(reminder.category);
 
-  for (const uid of userIds) {
-    const { data: alreadySent } = await supabase
-      .from('user_digests')
-      .select('user_id')
-      .eq('user_id', uid)
-      .eq('digest_date', todayStr)
+  let checklistText = '';
+  if (Array.isArray(reminder.items) && reminder.items.length > 0) {
+    const lines = reminder.items.map((it: any) => `${it.done ? '☑️' : '▫️'} ${escapeHtml(it.text)}`);
+    checklistText = `\n📋 <b>Підзавдання:</b>\n` + lines.join('\n');
+  }
+
+  let targetThreadId = reminder.thread_id;
+  if (!targetThreadId && team.is_forum) {
+    const { data: mapping } = await supabase
+      .from('team_category_topics')
+      .select('thread_id')
+      .eq('team_id', reminder.team_id)
+      .eq('category', categoryTag)
       .maybeSingle();
-
-    if (alreadySent) continue;
-
-    const { data: todayReminders } = await supabase
-      .from('reminders')
-      .select('*')
-      .eq('user_id', uid)
-      .gte('remind_at', startOfDay)
-      .lte('remind_at', endOfDay)
-      .order('remind_at', { ascending: true });
-
-    if (!todayReminders || todayReminders.length === 0) {
-      await supabase.from('user_digests').insert({ user_id: uid, digest_date: todayStr });
-      continue;
+    if (mapping?.thread_id && Number(mapping.thread_id) > 0) {
+      targetThreadId = mapping.thread_id;
     }
+  }
 
-    const itemsFormatted = todayReminders
+  const authorName = escapeHtml(reminder.created_by_name || 'Учасник');
+  const authorMention =
+    reminder.user_id && reminder.user_id !== 'guest'
+      ? `<a href="tg://user?id=${reminder.user_id}">${authorName}</a>`
+      : authorName;
+
+  const taggedList: any[] = Array.isArray(reminder.tagged_members) ? reminder.tagged_members : [];
+  const taggedMentions = taggedList
+    .map((m: any) => {
+      if (m.username) {
+        const u = String(m.username).replace(/^@/, '');
+        return `@${u}`;
+      }
+      if (m.id) {
+        return `<a href="tg://user?id=${m.id}">${escapeHtml(m.name || 'Учасник')}</a>`;
+      }
+      return escapeHtml(m.name || '');
+    })
+    .filter(Boolean)
+    .join(', ');
+
+  const groupMessage = [
+    `🔔 <b>Командне нагадування!</b>`,
+    ``,
+    `📌 <b>${escapeHtml(reminder.title)}</b>`,
+    reminder.description ? `📝 ${escapeHtml(reminder.description)}` : '',
+    checklistText,
+    `⏰ Час: <b>${timeFormatted}</b>`,
+    `🏷 Категорія: #${categoryTag}`,
+    `👤 Автор: ${authorMention}`,
+    taggedMentions ? `👥 Відповідальні: ${taggedMentions}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const groupPayload: any = {
+    chat_id: team.telegram_chat_id,
+    text: groupMessage,
+    parse_mode: 'HTML',
+  };
+  if (targetThreadId && Number(targetThreadId) > 0) {
+    groupPayload.message_thread_id = Number(targetThreadId);
+  }
+
+  const groupRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(groupPayload),
+  });
+
+  const pmRecipients = new Set<string>();
+  if (reminder.user_id && reminder.user_id !== 'guest') {
+    pmRecipients.add(String(reminder.user_id));
+  }
+  for (const tm of taggedList) {
+    if (tm.id && String(tm.id).match(/^\d+$/)) {
+      pmRecipients.add(String(tm.id));
+    }
+  }
+
+  const pmMessage = [
+    `👥 <b>Нагадування з команди «${escapeHtml(team.title || 'Команда')}»:</b>`,
+    ``,
+    `📌 <b>${escapeHtml(reminder.title)}</b>`,
+    reminder.description ? `📝 ${escapeHtml(reminder.description)}` : '',
+    checklistText,
+    `⏰ Час: <b>${timeFormatted}</b>`,
+    `🏷 Категорія: #${categoryTag}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  for (const pmId of pmRecipients) {
+    await sendPmAlert(botToken, pmId, pmMessage, siteUrl, team.id);
+  }
+
+  return groupRes.ok;
+}
+
+function formatDigestMessage(
+  ukDate: string,
+  personalReminders: any[],
+  teamReminders: any[]
+): string {
+  let personalSection = '';
+  if (personalReminders.length > 0) {
+    const pItems = personalReminders
       .map((r: any, idx: number) => {
         const time = new Date(r.remind_at).toLocaleTimeString('uk-UA', {
           hour: '2-digit',
@@ -206,13 +319,113 @@ async function handleMorningDigests(supabase: any, botToken: string, siteUrl: st
         return `${idx + 1}. ${status} <b>${time}</b> — ${escapeHtml(r.title)}`;
       })
       .join('\n');
+    personalSection = `📅 <b>Особисті справи:</b>\n${pItems}\n\n`;
+  }
 
-    const ukDate = `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
-    const digestText =
-      `☀️ <b>Доброго ранку! Ваш бриф на сьогодні:</b>\n` +
-      `📅 <b>${ukDate}</b>\n\n` +
-      `${itemsFormatted}\n\n` +
-      `Бажаємо продуктивного та легкого дня! 🚀`;
+  let teamSection = '';
+  if (teamReminders.length > 0) {
+    const tItems = teamReminders
+      .map((r: any) => {
+        const time = new Date(r.remind_at).toLocaleTimeString('uk-UA', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'Europe/Kyiv',
+        });
+        const status = r.is_sent ? '✅' : '⏰';
+        const cat = formatCategoryTag(r.category);
+        return `• «${escapeHtml(r.teamTitle)}»: ${status} <b>${time}</b> — ${escapeHtml(r.title)} (#${cat})`;
+      })
+      .join('\n');
+    teamSection = `👥 <b>Справи у ваших командах:</b>\n${tItems}\n\n`;
+  }
+
+  return (
+    `☀️ <b>Доброго ранку! Ваш бриф на сьогодні:</b>\n` +
+    `📅 <b>${ukDate}</b>\n\n` +
+    personalSection +
+    teamSection +
+    `Бажаємо продуктивного та легкого дня! 🚀`
+  );
+}
+
+async function fetchUserTeamReminders(supabase: any, uid: string, startIso: string, endIso: string) {
+  const { data: memberTeams } = await supabase
+    .from('team_members')
+    .select('team_id, role, teams(id, title)')
+    .eq('telegram_id', uid)
+    .neq('role', 'blocked');
+
+  if (!memberTeams || memberTeams.length === 0) return [];
+  const teamIds = memberTeams.map((mt: any) => mt.team_id);
+  const { data: tRems } = await supabase
+    .from('reminders')
+    .select('*')
+    .in('team_id', teamIds)
+    .gte('remind_at', startIso)
+    .lte('remind_at', endIso)
+    .order('remind_at', { ascending: true });
+
+  if (!tRems) return [];
+  return tRems.map((r: any) => {
+    const match = memberTeams.find((mt: any) => mt.team_id === r.team_id);
+    return { ...r, teamTitle: match?.teams?.title || 'Команда' };
+  });
+}
+
+async function handleMorningDigests(supabase: any, botToken: string, siteUrl: string) {
+  const kyiv = getKyivDateTime();
+  if (kyiv.hour !== 9 || kyiv.minute > 10) return;
+
+  const todayStr = kyiv.dateStr;
+  const { data: usersData } = await supabase
+    .from('reminders')
+    .select('user_id')
+    .neq('user_id', 'guest');
+  const { data: teamMembersData } = await supabase
+    .from('team_members')
+    .select('telegram_id')
+    .neq('role', 'blocked');
+
+  const allUserIds = new Set<string>();
+  (usersData || []).forEach((u: any) => u.user_id && allUserIds.add(String(u.user_id)));
+  (teamMembersData || []).forEach((m: any) => m.telegram_id && allUserIds.add(String(m.telegram_id)));
+
+  if (allUserIds.size === 0) return;
+
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const startOfDay = kyivToUtc(y, m, d, 0, 0).toISOString();
+  const endOfDay = kyivToUtc(y, m, d, 23, 59).toISOString();
+  const ukDate = `${String(d).padStart(2, '0')}.${String(m).padStart(2, '0')}.${y}`;
+
+  for (const uid of allUserIds) {
+    const { data: alreadySent } = await supabase
+      .from('user_digests')
+      .select('user_id')
+      .eq('user_id', uid)
+      .eq('digest_date', todayStr)
+      .maybeSingle();
+
+    if (alreadySent) continue;
+
+    const { data: personalReminders } = await supabase
+      .from('reminders')
+      .select('*')
+      .eq('user_id', uid)
+      .is('team_id', null)
+      .gte('remind_at', startOfDay)
+      .lte('remind_at', endOfDay)
+      .order('remind_at', { ascending: true });
+
+    const teamReminders = await fetchUserTeamReminders(supabase, uid, startOfDay, endOfDay);
+    const hasPersonal = personalReminders && personalReminders.length > 0;
+    const hasTeam = teamReminders.length > 0;
+
+    if (!hasPersonal && !hasTeam) {
+      await supabase.from('user_digests').insert({ user_id: uid, digest_date: todayStr });
+      continue;
+    }
+
+    const digestText = formatDigestMessage(ukDate, personalReminders || [], teamReminders);
 
     try {
       await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -223,9 +436,7 @@ async function handleMorningDigests(supabase: any, botToken: string, siteUrl: st
           text: digestText,
           parse_mode: 'HTML',
           reply_markup: {
-            inline_keyboard: [
-              [{ text: '📅 Відкрити Календар', web_app: { url: siteUrl } }],
-            ],
+            inline_keyboard: [[{ text: '📅 Відкрити Календар', web_app: { url: siteUrl } }]],
           },
         }),
       });
@@ -279,19 +490,23 @@ Deno.serve(async (req: Request) => {
 
   let sentCount = 0;
   for (const item of reminders) {
-    if (item.user_id && item.user_id !== 'guest') {
-      const ok = await sendTelegramAlert(BOT_TOKEN, item.user_id, item);
-      if (ok) {
-        sentCount++;
-        const nextDate = getNextRepeatDate(item.remind_at, item.repeat_type);
-        if (nextDate) {
-          await supabase
-            .from('reminders')
-            .update({ remind_at: nextDate, is_sent: false })
-            .eq('id', item.id);
-        } else {
-          await supabase.from('reminders').update({ is_sent: true }).eq('id', item.id);
-        }
+    let ok = false;
+    if (item.team_id) {
+      ok = await sendTeamReminderAlert(supabase, BOT_TOKEN, SITE_URL, item);
+    } else if (item.user_id && item.user_id !== 'guest') {
+      ok = await sendTelegramAlert(BOT_TOKEN, item.user_id, item);
+    }
+
+    if (ok) {
+      sentCount++;
+      const nextDate = getNextRepeatDate(item.remind_at, item.repeat_type);
+      if (nextDate) {
+        await supabase
+          .from('reminders')
+          .update({ remind_at: nextDate, is_sent: false })
+          .eq('id', item.id);
+      } else {
+        await supabase.from('reminders').update({ is_sent: true }).eq('id', item.id);
       }
     }
   }

@@ -56,5 +56,18 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@supabase')) return 'supabase';
+              if (id.includes('lucide-react')) return 'icons';
+              if (id.includes('react')) return 'vendor';
+            }
+          },
+        },
+      },
+    },
   };
 });

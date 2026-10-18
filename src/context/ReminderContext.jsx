@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useTelegram } from './TelegramContext';
+import { useTeam } from './TeamContext';
 import { LOCAL_STORAGE_KEY, LOCAL_STORAGE_CUSTOM_CATEGORIES } from '../utils/constants';
 
 const ReminderContext = createContext(null);
 
 export function ReminderProvider({ children }) {
-  const { activeUserId, triggerHaptic } = useTelegram();
+  const { user, activeUserId, triggerHaptic } = useTelegram();
+  const { activeTeamId } = useTeam();
   const [reminders, setReminders] = useState([]);
   const [customCategories, setCustomCategories] = useState(() => {
     try {
@@ -20,33 +22,36 @@ export function ReminderProvider({ children }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewDate, setViewDate] = useState(new Date());
 
+  const storageKey = activeTeamId ? `${LOCAL_STORAGE_KEY}_${activeTeamId}` : LOCAL_STORAGE_KEY;
+
   const loadLocalReminders = useCallback(() => {
     try {
-      const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const data = localStorage.getItem(storageKey);
       if (data) {
         setReminders(JSON.parse(data));
       } else {
         const initialDate = new Date();
         initialDate.setHours(initialDate.getHours() + 1, 0, 0, 0);
         const starter = [{
-          id: 'starter-1',
+          id: `starter-${Date.now()}`,
           user_id: activeUserId || 'guest',
-          title: 'Ласкаво просимо до Календаря!',
-          description: 'Підключіть Telegram бот для отримання нагадувань.',
+          team_id: activeTeamId || null,
+          title: activeTeamId ? 'Ласкаво просимо до командного календаря!' : 'Ласкаво просимо до Календаря!',
+          description: 'Події синхронізуються через Telegram бот.',
           remind_at: initialDate.toISOString(),
           category: 'main',
           is_sent: false,
           created_at: new Date().toISOString()
         }];
         setReminders(starter);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(starter));
+        localStorage.setItem(storageKey, JSON.stringify(starter));
       }
     } catch (e) {
       console.error('Failed to load local reminders', e);
     } finally {
       setLoading(false);
     }
-  }, [activeUserId]);
+  }, [activeUserId, activeTeamId, storageKey]);
 
   const fetchCategories = useCallback(async (remList) => {
     let serverCats = [];
@@ -86,8 +91,13 @@ export function ReminderProvider({ children }) {
 
     try {
       let query = supabase.from('reminders').select('*').order('remind_at', { ascending: true });
-      if (activeUserId) {
-        query = query.eq('user_id', activeUserId);
+      if (activeTeamId) {
+        query = query.eq('team_id', activeTeamId);
+      } else {
+        query = query.is('team_id', null);
+        if (activeUserId) {
+          query = query.eq('user_id', activeUserId);
+        }
       }
       const { data, error } = await query;
       if (error) throw error;
@@ -100,7 +110,7 @@ export function ReminderProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [activeUserId, loadLocalReminders, fetchCategories]);
+  }, [activeUserId, activeTeamId, loadLocalReminders, fetchCategories]);
 
   useEffect(() => {
     fetchReminders();
@@ -112,6 +122,8 @@ export function ReminderProvider({ children }) {
       ...item,
       id: item.id || `rem-${Date.now()}`,
       user_id: activeUserId || 'guest',
+      team_id: activeTeamId || null,
+      created_by_name: user?.first_name || user?.username || '',
       is_sent: false,
       created_at: new Date().toISOString()
     };
@@ -131,7 +143,7 @@ export function ReminderProvider({ children }) {
 
     setReminders((prev) => {
       const updated = [...prev, newReminder];
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
       return updated;
     });
     return newReminder;
@@ -150,7 +162,7 @@ export function ReminderProvider({ children }) {
 
     setReminders((prev) => {
       const updated = prev.map((r) => (r.id === id ? { ...r, ...updates } : r));
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
       return updated;
     });
   };
@@ -168,7 +180,7 @@ export function ReminderProvider({ children }) {
 
     setReminders((prev) => {
       const updated = prev.filter((r) => r.id !== id);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
       return updated;
     });
   };
