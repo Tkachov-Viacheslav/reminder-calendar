@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useTelegram } from './TelegramContext';
 import { useToast } from './ToastContext';
@@ -133,7 +133,7 @@ export function TeamProvider({ children }) {
         return;
       }
 
-      // 2. Fetch team members with deduplication
+      // 2. Fetch team members with deduplication in memory
       const { data: rawMembers } = await supabase
         .from('team_members')
         .select('*')
@@ -142,7 +142,6 @@ export function TeamProvider({ children }) {
 
       const uniqueList = [];
       const seen = new Map();
-      const duplicatesToDelete = [];
 
       for (const m of rawMembers || []) {
         const cleanUser = (m.username || '').replace(/^@/, '').toLowerCase();
@@ -159,20 +158,8 @@ export function TeamProvider({ children }) {
             const idx = uniqueList.indexOf(prev);
             if (idx !== -1) uniqueList[idx] = m;
             seen.set(key, m);
-            duplicatesToDelete.push(prev.id);
-          } else {
-            duplicatesToDelete.push(m.id);
           }
         }
-      }
-
-      if (duplicatesToDelete.length > 0) {
-        supabase
-          .from('team_members')
-          .delete()
-          .in('id', duplicatesToDelete)
-          .then(() => {})
-          .catch(() => {});
       }
 
       setTeamMembers(uniqueList);
@@ -195,7 +182,15 @@ export function TeamProvider({ children }) {
       (mappings || []).forEach((m) => {
         mapObj[m.category] = m.thread_id;
       });
-      setCategoryTopics(mapObj);
+      setCategoryTopics((prev) => {
+        const prevKeys = Object.keys(prev || {});
+        const newKeys = Object.keys(mapObj);
+        if (prevKeys.length !== newKeys.length) return mapObj;
+        for (const k of newKeys) {
+          if (prev[k] !== mapObj[k]) return mapObj;
+        }
+        return prev;
+      });
     } catch (err) {
       console.error('Failed to fetch team data:', err);
     } finally {
@@ -223,9 +218,27 @@ export function TeamProvider({ children }) {
     };
   }, [fetchUserTeams, fetchCurrentTeamData]);
 
-  // Realtime subscription for teams and team_members
+  const activeTeamIdRef = useRef(activeTeamId);
+  activeTeamIdRef.current = activeTeamId;
+  const fetchUserTeamsRef = useRef(fetchUserTeams);
+  fetchUserTeamsRef.current = fetchUserTeams;
+  const fetchCurrentTeamDataRef = useRef(fetchCurrentTeamData);
+  fetchCurrentTeamDataRef.current = fetchCurrentTeamData;
+
+  // Realtime subscription for teams and team_members (single stable channel)
   useEffect(() => {
     if (!isSupabaseConfigured() || !supabase) return;
+
+    let debounceTimer = null;
+    const scheduleRefresh = (fetchTeamDetails = true) => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchUserTeamsRef.current?.();
+        if (fetchTeamDetails && activeTeamIdRef.current) {
+          fetchCurrentTeamDataRef.current?.();
+        }
+      }, 1000);
+    };
 
     const channel = supabase
       .channel('public:teams_realtime')
@@ -236,7 +249,7 @@ export function TeamProvider({ children }) {
           if (payload.eventType === 'DELETE') {
             const deletedId = payload.old?.id;
             setUserTeams((prev) => prev.filter((t) => t.id !== deletedId));
-            if (activeTeamId === deletedId) {
+            if (activeTeamIdRef.current === deletedId) {
               setActiveTeamId(null);
               setCurrentTeam(null);
               try {
@@ -245,10 +258,7 @@ export function TeamProvider({ children }) {
               showToast('Команду видалено або бот покинув чат', 'info');
             }
           } else {
-            fetchUserTeams();
-            if (activeTeamId && payload.new?.id === activeTeamId) {
-              fetchCurrentTeamData();
-            }
+            scheduleRefresh(payload.new?.id === activeTeamIdRef.current);
           }
         }
       )
@@ -256,18 +266,16 @@ export function TeamProvider({ children }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'team_members' },
         () => {
-          fetchUserTeams();
-          if (activeTeamId) {
-            fetchCurrentTeamData();
-          }
+          scheduleRefresh(true);
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
-  }, [activeTeamId, fetchUserTeams, fetchCurrentTeamData, showToast]);
+  }, [showToast]);
 
   const switchWorkspace = useCallback(
     (teamId) => {

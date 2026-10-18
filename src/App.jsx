@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { TelegramProvider } from './context/TelegramContext';
 import { TeamProvider, useTeam } from './context/TeamContext';
 import { ReminderProvider, useReminders } from './context/ReminderContext';
@@ -6,14 +6,22 @@ import { Header } from './components/Header';
 import { CalendarHeader } from './components/Calendar/CalendarHeader';
 import { MonthView } from './components/Calendar/MonthView';
 import { ReminderList } from './components/Reminders/ReminderList';
-import { ReminderModal } from './components/Reminders/ReminderModal';
-import { AuthModal } from './components/Telegram/AuthModal';
-import { TeamSettingsModal } from './components/Team/TeamSettingsModal';
 import { isSupabaseConfigured } from './services/supabase';
 import { Info, Users } from 'lucide-react';
 import { Card, Badge } from './components/ui';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './context/ToastContext';
+
+// Lazy load modals to reduce initial memory footprint and bundle execution
+const ReminderModal = lazy(() =>
+  import('./components/Reminders/ReminderModal').then((m) => ({ default: m.ReminderModal }))
+);
+const AuthModal = lazy(() =>
+  import('./components/Telegram/AuthModal').then((m) => ({ default: m.AuthModal }))
+);
+const TeamSettingsModal = lazy(() =>
+  import('./components/Team/TeamSettingsModal').then((m) => ({ default: m.TeamSettingsModal }))
+);
 
 function CalendarContent() {
   const {
@@ -136,22 +144,30 @@ function CalendarContent() {
         </div>
       </main>
 
-      {/* Modals */}
-      <ReminderModal
-        isOpen={isReminderModalOpen}
-        onClose={handleCloseReminderModal}
-        onSave={handleSaveReminder}
-        initialDate={selectedDate}
-        editingReminder={editingReminder}
-      />
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-      />
-      <TeamSettingsModal
-        isOpen={isTeamSettingsOpen}
-        onClose={() => setIsTeamSettingsOpen(false)}
-      />
+      {/* Modals with lazy loading and conditional rendering */}
+      <Suspense fallback={null}>
+        {isReminderModalOpen && (
+          <ReminderModal
+            isOpen={isReminderModalOpen}
+            onClose={handleCloseReminderModal}
+            onSave={handleSaveReminder}
+            initialDate={selectedDate}
+            editingReminder={editingReminder}
+          />
+        )}
+        {isAuthModalOpen && (
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+          />
+        )}
+        {isTeamSettingsOpen && (
+          <TeamSettingsModal
+            isOpen={isTeamSettingsOpen}
+            onClose={() => setIsTeamSettingsOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

@@ -1,7 +1,12 @@
 import { BOT_TOKEN, SITE_URL } from './config.ts';
 import { getSupabaseClient } from './db.ts';
 import { tryParseQuickReminder } from './utils.ts';
-import { answerCallbackQuery, sendGroupMessage, getBotChatStatus } from './telegram.ts';
+import {
+  answerCallbackQuery,
+  sendGroupMessage,
+  getBotChatStatus,
+  deleteTelegramMessage,
+} from './telegram.ts';
 import { ensureTeamExists, recordTeamMember, recordTopic } from './teams.ts';
 import {
   sendAuthCode,
@@ -50,6 +55,9 @@ Deno.serve(async (req: Request) => {
         const supabase = getSupabaseClient();
         await supabase.from('reminders').update({ is_sent: true }).eq('id', reminderId);
         await answerCallbackQuery(BOT_TOKEN, cq.id, '✅ Нагадування виконано!');
+        if (cq.message?.chat?.id && cq.message?.message_id) {
+          await deleteTelegramMessage(BOT_TOKEN, cq.message.chat.id, cq.message.message_id);
+        }
       } else if (cq.data.startsWith('snooze_')) {
         const reminderId = cq.data.replace('snooze_', '');
         const supabase = getSupabaseClient();

@@ -1,5 +1,24 @@
 import { getSupabaseClient } from './db.ts';
 
+export async function deleteTelegramMessage(
+  botToken: string,
+  chatId: string | number,
+  messageId: string | number
+): Promise<boolean> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, message_id: Number(messageId) }),
+    });
+    const data = await res.json();
+    return !!data?.ok;
+  } catch (err) {
+    console.warn(`Failed to delete message ${messageId} in chat ${chatId}:`, err);
+    return false;
+  }
+}
+
 export async function sendBotMessage(
   botToken: string,
   chatId: string | number,
@@ -47,35 +66,48 @@ export async function sendGroupMessage(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
   const data = await res.json();
 
   if (data?.ok && data.result?.message_id) {
+    const botMsgId = data.result.message_id;
+    const delaySec = 30;
+
+    // 1. Негайний фоновий таймер на 30 секунд для миттєвого видалення
+    const scheduleImmediateDeletion = async () => {
+      await new Promise((resolve) => setTimeout(resolve, delaySec * 1000));
+      await deleteTelegramMessage(botToken, chatId, botMsgId);
+      if (incomingMessageId) {
+        await deleteTelegramMessage(botToken, chatId, incomingMessageId);
+      }
+    };
+
+    // EdgeRuntime.waitUntil підтримується у середовищі Supabase / Deno Edge
+    if (typeof (globalThis as any).EdgeRuntime?.waitUntil === 'function') {
+      (globalThis as any).EdgeRuntime.waitUntil(scheduleImmediateDeletion());
+    } else {
+      scheduleImmediateDeletion().catch((err) =>
+        console.warn('Background deletion error:', err)
+      );
+    }
+
+    // 2. Збереження в таблицю bot_ephemeral_messages для резервного cron-видалення
     try {
       const supabase = getSupabaseClient();
-      const teamId = `team_${chatId}`;
-      const { data: team } = await supabase
-        .from('teams')
-        .select('auto_delete_seconds')
-        .eq('id', teamId)
-        .maybeSingle();
-
-      const delay = 30; // Фіксоване автовидалення через 30 секунд
-      if (delay > 0) {
-        const deleteAt = new Date(Date.now() + delay * 1000).toISOString();
-        const inserts: any[] = [
-          { chat_id: String(chatId), message_id: Number(data.result.message_id), delete_at: deleteAt },
-        ];
-        if (incomingMessageId) {
-          inserts.push({
-            chat_id: String(chatId),
-            message_id: Number(incomingMessageId),
-            delete_at: deleteAt,
-          });
-        }
-        await supabase.from('bot_ephemeral_messages').insert(inserts);
+      const deleteAt = new Date(Date.now() + delaySec * 1000).toISOString();
+      const inserts: any[] = [
+        { chat_id: String(chatId), message_id: Number(botMsgId), delete_at: deleteAt },
+      ];
+      if (incomingMessageId) {
+        inserts.push({
+          chat_id: String(chatId),
+          message_id: Number(incomingMessageId),
+          delete_at: deleteAt,
+        });
       }
+      await supabase.from('bot_ephemeral_messages').insert(inserts);
     } catch (err) {
-      console.warn('Failed to schedule ephemeral message deletion:', err);
+      console.warn('Failed to schedule ephemeral message deletion in DB:', err);
     }
   }
 

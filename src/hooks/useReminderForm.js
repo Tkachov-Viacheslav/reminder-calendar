@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DEFAULT_CATEGORY } from '../utils/constants';
 import { toISODateString } from '../utils/dateUtils';
 import { useTelegram } from '../context/TelegramContext';
@@ -14,6 +14,9 @@ export function useReminderForm({
 }) {
   const { triggerHaptic } = useTelegram();
   const { addCustomCategory, deleteCustomCategory } = useReminders();
+
+  const categoryTopicsRef = useRef(categoryTopics);
+  categoryTopicsRef.current = categoryTopics;
 
   const getDefaultTime = () => {
     const d = new Date();
@@ -33,8 +36,23 @@ export function useReminderForm({
   const [taggedMembers, setTaggedMembers] = useState([]);
   const [error, setError] = useState('');
 
+  const isInitializedRef = useRef(false);
+  const editingIdRef = useRef(null);
+
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      isInitializedRef.current = false;
+      return;
+    }
+
+    const currentEditingId = editingReminder?.id || null;
+    if (isInitializedRef.current && editingIdRef.current === currentEditingId) {
+      return;
+    }
+
+    isInitializedRef.current = true;
+    editingIdRef.current = currentEditingId;
+
     if (editingReminder) {
       setTitle(editingReminder.title || '');
       setDescription(editingReminder.description || '');
@@ -59,28 +77,29 @@ export function useReminderForm({
       setRepeatType('none');
       setRemindBefore(0);
       setItems([]);
-      const mappedThread = categoryTopics?.[initialCat.toLowerCase()];
+      const mappedThread = categoryTopicsRef.current?.[initialCat.toLowerCase()];
       setThreadId(mappedThread && Number(mappedThread) > 0 ? Number(mappedThread) : null);
       setTaggedMembers([]);
       setDateStr(toISODateString(initialDate || new Date()));
       setTimeStr(getDefaultTime());
     }
     setError('');
-  }, [isOpen, editingReminder, initialDate, categoryTopics]);
+  }, [isOpen, editingReminder?.id, initialDate]);
 
   const handleSelectCategory = useCallback(
     (catId) => {
       triggerHaptic('light');
       setCategory(catId);
-      if (categoryTopics) {
+      const currentMap = categoryTopicsRef.current;
+      if (currentMap) {
         const cleanCat = String(catId).toLowerCase().trim();
-        const mapped = categoryTopics[cleanCat];
-        if (mapped !== undefined) {
-          setThreadId(Number(mapped) > 0 ? Number(mapped) : null);
+        const mapped = currentMap[cleanCat];
+        if (mapped !== undefined && Number(mapped) > 0) {
+          setThreadId(Number(mapped));
         }
       }
     },
-    [categoryTopics, triggerHaptic]
+    [triggerHaptic]
   );
 
   const handleSelectThreadId = useCallback(
@@ -88,16 +107,8 @@ export function useReminderForm({
       triggerHaptic('light');
       const tid = Number(newThreadId) || null;
       setThreadId(tid);
-      if (categoryTopics && tid) {
-        const matched = Object.entries(categoryTopics).find(
-          ([_, mappedTid]) => Number(mappedTid) === tid
-        );
-        if (matched && matched[0]) {
-          setCategory(matched[0]);
-        }
-      }
     },
-    [categoryTopics, triggerHaptic]
+    [triggerHaptic]
   );
 
   const handleToggleMemberTag = useCallback((member) => {
