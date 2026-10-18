@@ -49,7 +49,7 @@ export async function recordTeamMember(supabase: any, teamId: string, user: any,
       .ilike('username', cleanUsername)
       .maybeSingle();
 
-    if (placeholder && String(placeholder.telegram_id).startsWith('@')) {
+    if (placeholder) {
       existing = placeholder;
     }
   }

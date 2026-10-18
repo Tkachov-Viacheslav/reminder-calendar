@@ -133,13 +133,49 @@ export function TeamProvider({ children }) {
         return;
       }
 
-      // 2. Fetch team members
-      const { data: members } = await supabase
+      // 2. Fetch team members with deduplication
+      const { data: rawMembers } = await supabase
         .from('team_members')
         .select('*')
         .eq('team_id', activeTeamId)
         .order('first_name', { ascending: true });
-      setTeamMembers(members || []);
+
+      const uniqueList = [];
+      const seen = new Map();
+      const duplicatesToDelete = [];
+
+      for (const m of rawMembers || []) {
+        const cleanUser = (m.username || '').replace(/^@/, '').toLowerCase();
+        const key = cleanUser || m.telegram_id;
+        if (!seen.has(key)) {
+          seen.set(key, m);
+          uniqueList.push(m);
+        } else {
+          const prev = seen.get(key);
+          const isCurrReal = !String(m.telegram_id).startsWith('@') && String(m.telegram_id).length <= 12;
+          const isPrevReal = !String(prev.telegram_id).startsWith('@') && String(prev.telegram_id).length <= 12;
+
+          if ((m.role === 'admin' && prev.role !== 'admin') || (isCurrReal && !isPrevReal)) {
+            const idx = uniqueList.indexOf(prev);
+            if (idx !== -1) uniqueList[idx] = m;
+            seen.set(key, m);
+            duplicatesToDelete.push(prev.id);
+          } else {
+            duplicatesToDelete.push(m.id);
+          }
+        }
+      }
+
+      if (duplicatesToDelete.length > 0) {
+        supabase
+          .from('team_members')
+          .delete()
+          .in('id', duplicatesToDelete)
+          .then(() => {})
+          .catch(() => {});
+      }
+
+      setTeamMembers(uniqueList);
 
       // 3. Fetch team topics
       const { data: topics } = await supabase
