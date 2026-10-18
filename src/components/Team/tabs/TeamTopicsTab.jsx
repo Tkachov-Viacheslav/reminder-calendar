@@ -9,6 +9,7 @@ export function TeamTopicsTab({
   allCategories,
   categoryTopics,
   setCategoryTopicMapping,
+  isTeamAdmin = false,
 }) {
   const [isAddingTopic, setIsAddingTopic] = useState(false);
   const [newTopicName, setNewTopicName] = useState('');
@@ -36,7 +37,7 @@ export function TeamTopicsTab({
           Щоб зафіксувати тему:
         </p>
         <ul className="text-[11px] list-disc list-inside space-y-0.5 text-indigo-800 dark:text-indigo-300">
-          <li>Напишіть у потрібній гілці чату <code>/topic Назва теми</code></li>
+          <li>Адміністратор пише в темі чату <code>/topic Назва теми</code></li>
           <li>Або <code>/bind назва_категорії</code> для миттєвої прив'язки</li>
           <li>Або додайте тему вручну за її ID нижче</li>
         </ul>
@@ -49,7 +50,7 @@ export function TeamTopicsTab({
             <Hash className="w-3.5 h-3.5 text-violet-500" />
             <span>Відомі теми форуму ({teamTopics.length})</span>
           </h4>
-          {!isAddingTopic && (
+          {isTeamAdmin && !isAddingTopic && (
             <button
               type="button"
               onClick={() => setIsAddingTopic(true)}
@@ -113,15 +114,16 @@ export function TeamTopicsTab({
                 className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-violet-50 dark:bg-violet-950/50 border border-violet-200 dark:border-violet-800/60 text-violet-800 dark:text-violet-200 text-xs font-medium"
               >
                 <span>#{top.name}</span>
-                <span className="text-[10px] text-violet-400">({top.thread_id})</span>
-                <button
-                  type="button"
-                  onClick={() => deleteTeamTopic(top.id)}
-                  className="hover:text-rose-500 p-0.5"
-                  title="Видалити тему"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+                {isTeamAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => deleteTeamTopic(top.id)}
+                    className="hover:text-rose-500 p-0.5"
+                    title="Видалити тему"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
               </span>
             ))}
           </div>
@@ -149,9 +151,12 @@ export function TeamTopicsTab({
                   #{cat.label}
                 </span>
                 <select
+                  disabled={!isTeamAdmin}
                   value={currentThread}
                   onChange={(e) => setCategoryTopicMapping(cat.id, e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px]"
+                  className={`px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px] ${
+                    !isTeamAdmin ? 'opacity-60 cursor-not-allowed' : ''
+                  }`}
                 >
                   <option value="0">Загальний чат / За замовчуванням</option>
                   {teamTopics.map((topic) => (

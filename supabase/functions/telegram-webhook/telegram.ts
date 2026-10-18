@@ -59,7 +59,7 @@ export async function sendGroupMessage(
         .eq('id', teamId)
         .maybeSingle();
 
-      const delay = team?.auto_delete_seconds ?? 120;
+      const delay = 30; // Фіксоване автовидалення через 30 секунд
       if (delay > 0) {
         const deleteAt = new Date(Date.now() + delay * 1000).toISOString();
         const inserts: any[] = [

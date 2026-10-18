@@ -8,6 +8,7 @@ import {
   deleteTeamData,
   getUserTeamsWithRoles,
   formatTeamStatusItem,
+  isSenderAdmin,
 } from './teams.ts';
 import { getSupabaseClient } from './db.ts';
 
@@ -350,14 +351,18 @@ export async function handleBindCommand(
     return;
   }
 
-  const { data: member } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('team_id', teamId)
-    .eq('telegram_id', String(user?.id))
-    .maybeSingle();
-
-  if (member && member.role === 'blocked') return;
+  const isAdmin = await isSenderAdmin(supabase, teamId, user, botToken, chatId);
+  if (!isAdmin) {
+    await sendGroupMessage(
+      botToken,
+      chatId,
+      '⚠️ Тільки адміністратори команди можуть прив\'язувати теми до категорій.',
+      threadId,
+      [],
+      incomingMessageId
+    );
+    return;
+  }
 
   const cleanCategory = categoryRaw.toLowerCase().replace('#', '');
   await supabase.from('team_category_topics').upsert(
@@ -405,6 +410,19 @@ export async function handleTopicCommand(
   const topicName = parts.join(' ').trim();
   const teamId = `team_${chatId}`;
   const supabase = getSupabaseClient();
+
+  const isAdmin = await isSenderAdmin(supabase, teamId, user, botToken, chatId);
+  if (!isAdmin) {
+    await sendGroupMessage(
+      botToken,
+      chatId,
+      '⚠️ Тільки адміністратори команди можуть реєструвати нові теми.',
+      threadId,
+      [],
+      incomingMessageId
+    );
+    return;
+  }
 
   if (!topicName) {
     await sendGroupMessage(

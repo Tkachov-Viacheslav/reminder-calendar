@@ -195,3 +195,60 @@ export function formatTeamStatusItem(
 
   return { line, button };
 }
+
+export async function isSenderAdmin(
+  supabase: any,
+  teamId: string,
+  user: any,
+  botToken: string,
+  chatId: string | number
+): Promise<boolean> {
+  if (!user || !user.id) return false;
+  const userId = String(user.id);
+
+  // 1. Check in team_members table
+  const { data: member } = await supabase
+    .from('team_members')
+    .select('role')
+    .eq('team_id', teamId)
+    .eq('telegram_id', userId)
+    .maybeSingle();
+
+  if (member?.role === 'admin') return true;
+
+  // 2. Check in teams.created_by
+  const { data: team } = await supabase
+    .from('teams')
+    .select('created_by')
+    .eq('id', teamId)
+    .maybeSingle();
+
+  if (team?.created_by === userId) return true;
+
+  // 3. Fallback: check Telegram getChatMember
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/getChatMember`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, user_id: Number(userId) }),
+    });
+    const data = await res.json();
+    if (data.ok && (data.result.status === 'administrator' || data.result.status === 'creator')) {
+      await supabase
+        .from('team_members')
+        .upsert(
+          {
+            team_id: teamId,
+            telegram_id: userId,
+            first_name: user.first_name || '',
+            username: (user.username || '').replace(/^@/, ''),
+            role: 'admin',
+          },
+          { onConflict: 'team_id,telegram_id' }
+        );
+      return true;
+    }
+  } catch {}
+
+  return false;
+}

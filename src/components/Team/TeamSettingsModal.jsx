@@ -121,6 +121,7 @@ export function TeamSettingsModal({ isOpen, onClose }) {
               allCategories={allCategories}
               categoryTopics={categoryTopics}
               setCategoryTopicMapping={setCategoryTopicMapping}
+              isTeamAdmin={isTeamAdmin}
             />
           )}
         </div>
