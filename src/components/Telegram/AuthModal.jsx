@@ -1,59 +1,80 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, KeyRound, ExternalLink, LogOut, Bot, User, ShieldCheck } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'reminderveter_bot';
+const CLIENT_ID = import.meta.env.VITE_TELEGRAM_CLIENT_ID || '8785054597';
 
 export function AuthModal({ isOpen, onClose }) {
   const { isInTelegram, user, isAuthenticated, loginWithCode, loginWithTelegram, logout } = useTelegram();
   const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [codeLoading, setCodeLoading] = useState(false);
+  const [tgLoading, setTgLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCodeInput, setShowCodeInput] = useState(false);
-  const telegramWrapperRef = useRef(null);
 
   useEffect(() => {
-    if (!isOpen || isAuthenticated) return;
-
-    window.onTelegramAuth = (tgUser) => {
-      loginWithTelegram(tgUser);
-      onClose();
-    };
-
-    const container = telegramWrapperRef.current;
-    if (container) {
-      container.innerHTML = '';
+    if (typeof window === 'undefined') return;
+    if (!window.Telegram?.Login) {
       const script = document.createElement('script');
-      script.src = 'https://telegram.org/js/telegram-widget.js?22';
-      script.setAttribute('data-telegram-login', BOT_USERNAME);
-      script.setAttribute('data-size', 'large');
-      script.setAttribute('data-radius', '12');
-      script.setAttribute('data-lang', 'uk');
-      script.setAttribute('data-userpic', 'true');
-      script.setAttribute('data-request-access', 'write');
-      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      script.src = 'https://oauth.telegram.org/js/telegram-login.js';
       script.async = true;
-      container.appendChild(script);
+      document.body.appendChild(script);
     }
-
-    return () => {
-      delete window.onTelegramAuth;
-    };
-  }, [isOpen, isAuthenticated, loginWithTelegram, onClose]);
+  }, []);
 
   if (!isOpen) return null;
 
-  const handleLogin = async (e) => {
+  const handleTelegramOidc = () => {
+    if (!window.Telegram?.Login) {
+      setError('Сервіс Telegram завантажується, спробуйте ще раз через мить');
+      return;
+    }
+
+    setTgLoading(true);
+    setError('');
+
+    try {
+      window.Telegram.Login.auth(
+        {
+          client_id: CLIENT_ID,
+          request_access: ['write'],
+          lang: 'uk',
+        },
+        (result) => {
+          setTgLoading(false);
+          if (!result || result.error) {
+            if (result?.error && result.error !== 'popup_closed') {
+              setError(`Помилка Telegram: ${result.error}`);
+            }
+            return;
+          }
+
+          const res = loginWithTelegram(result);
+          if (res.success) {
+            onClose();
+          } else {
+            setError(res.error || 'Помилка авторизації');
+          }
+        }
+      );
+    } catch (err) {
+      setTgLoading(false);
+      setError(err?.message || 'Помилка запуску авторизації');
+    }
+  };
+
+  const handleCodeLogin = async (e) => {
     e.preventDefault();
     if (!code || code.trim().length !== 6) {
       setError('Введіть 6-значний код від бота');
       return;
     }
 
-    setLoading(true);
+    setCodeLoading(true);
     setError('');
     const res = await loginWithCode(code);
-    setLoading(false);
+    setCodeLoading(false);
 
     if (res.success) {
       setCode('');
@@ -113,7 +134,6 @@ export function AuthModal({ isOpen, onClose }) {
                 </span>
               </div>
 
-              {/* Logout button */}
               {!isInTelegram && (
                 <button
                   onClick={logout}
@@ -127,16 +147,38 @@ export function AuthModal({ isOpen, onClose }) {
           ) : (
             /* Login options */
             <div className="space-y-4">
-              {/* Primary 1-Click Telegram Login Widget */}
-              <div className="text-center space-y-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Безпечна авторизація в 1 клік без введення паролів:
-                </p>
-                <div
-                  ref={telegramWrapperRef}
-                  className="flex justify-center items-center min-h-[44px] py-1"
-                />
+              {/* Primary 1-Click Telegram Button */}
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-slate-900 dark:text-slate-100">
+                      Швидка авторизація в 1 клік
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Синхронізація розкладу без паролів через офіційний Telegram
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleTelegramOidc}
+                  disabled={tgLoading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/25 transition-all hover:scale-[1.01] disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 fill-white shrink-0" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .36z"/>
+                  </svg>
+                  <span>{tgLoading ? 'З’єднуємося...' : 'Увійти через Telegram'}</span>
+                </button>
               </div>
+
+              {error && (
+                <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-600 dark:text-rose-400 text-center font-medium">
+                  {error}
+                </div>
+              )}
 
               {/* Divider */}
               <div className="relative flex items-center justify-center my-3">
@@ -174,7 +216,7 @@ export function AuthModal({ isOpen, onClose }) {
                     </a>
                   </div>
 
-                  <form onSubmit={handleLogin} className="space-y-3">
+                  <form onSubmit={handleCodeLogin} className="space-y-3">
                     <input
                       type="text"
                       maxLength={6}
@@ -188,18 +230,12 @@ export function AuthModal({ isOpen, onClose }) {
                       className="w-full px-3 py-2 text-center tracking-widest text-base font-mono font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
 
-                    {error && (
-                      <p className="text-xs text-rose-500 font-medium text-center">
-                        {error}
-                      </p>
-                    )}
-
                     <button
                       type="submit"
-                      disabled={loading || code.length !== 6}
+                      disabled={codeLoading || code.length !== 6}
                       className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                     >
-                      {loading ? 'Перевіряємо...' : 'Підтвердити код'}
+                      {codeLoading ? 'Перевіряємо...' : 'Підтвердити код'}
                     </button>
                   </form>
                 </div>

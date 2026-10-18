@@ -29,13 +29,17 @@ export function TelegramProvider({ children }) {
     }
   };
 
-  const loginWithTelegram = useCallback((tgUser) => {
-    if (!tgUser || !tgUser.id) return { success: false, error: 'Дані користувача відсутні' };
+  const loginWithTelegram = useCallback((authResult) => {
+    if (!authResult) return { success: false, error: 'Дані користувача відсутні' };
+    const u = authResult.user || authResult;
+    const userId = u.sub || u.id;
+    if (!userId) return { success: false, error: authResult.error || 'ID користувача відсутній' };
+
     const formattedUser = {
-      id: String(tgUser.id),
-      first_name: tgUser.first_name || '',
-      username: tgUser.username || '',
-      photo_url: tgUser.photo_url || '',
+      id: String(userId),
+      first_name: u.name || u.first_name || '',
+      username: u.preferred_username || u.username || '',
+      photo_url: u.picture || u.photo_url || '',
     };
     setUser(formattedUser);
     localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(formattedUser));
