@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  MONTH_NAMES_UA,
   WEEKDAY_NAMES_UA,
   getMonthMatrix,
   isSameDay,
@@ -8,6 +9,16 @@ import {
 } from '../../utils/dateUtils';
 import { getCategoryMeta } from '../../utils/constants';
 import { useTelegram } from '../../context/TelegramContext';
+
+const WEEKDAY_FULL_NAMES = [
+  'Понеділок',
+  'Вівторок',
+  'Середа',
+  'Четвер',
+  'П’ятниця',
+  'Субота',
+  'Неділя',
+];
 
 export const MonthView = React.memo(function MonthView({
   viewDate,
@@ -39,13 +50,21 @@ export const MonthView = React.memo(function MonthView({
     onSelectDate(date);
   };
 
+  const gridLabel = `Календар: ${MONTH_NAMES_UA[month] || ''} ${year}`;
+
   return (
-    <div className="w-full">
-      {/* Weekday labels */}
-      <div className="grid grid-cols-7 mb-1 text-center">
+    <div
+      role="grid"
+      aria-label={gridLabel}
+      className="w-full"
+    >
+      {/* Weekday labels header */}
+      <div role="row" className="grid grid-cols-7 mb-1 text-center">
         {WEEKDAY_NAMES_UA.map((day, idx) => (
           <div
             key={day}
+            role="columnheader"
+            aria-label={WEEKDAY_FULL_NAMES[idx] || day}
             className={`py-2 text-xs font-semibold ${
               idx >= 5 ? 'text-rose-500/80 dark:text-rose-400/80' : 'text-slate-400 dark:text-slate-500'
             }`}
@@ -55,17 +74,32 @@ export const MonthView = React.memo(function MonthView({
         ))}
       </div>
 
-      {/* Days grid */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+      {/* Days grid rowgroup */}
+      <div role="rowgroup" className="grid grid-cols-7 gap-1 sm:gap-1.5">
         {days.map((item, index) => {
           const dateKey = toISODateString(item.date);
           const dayReminders = remindersByDate.get(dateKey) || [];
           const isSelected = isSameDay(item.date, selectedDate);
           const today = isToday(item.date);
 
+          const fullDateLabel = item.date.toLocaleDateString('uk-UA', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          });
+          const remindersCountText = dayReminders.length > 0
+            ? `, ${dayReminders.length} нагадувань`
+            : '';
+          const ariaLabel = `${fullDateLabel}${today ? ', сьогодні' : ''}${remindersCountText}`;
+
           return (
             <button
               key={index}
+              type="button"
+              role="gridcell"
+              aria-selected={isSelected}
+              aria-current={today ? 'date' : undefined}
+              aria-label={ariaLabel}
               onClick={() => handleDayClick(item.date)}
               className={`min-h-[52px] sm:min-h-[64px] p-1 sm:p-1.5 rounded-xl flex flex-col items-center justify-between transition-all relative group border text-left ${
                 isSelected

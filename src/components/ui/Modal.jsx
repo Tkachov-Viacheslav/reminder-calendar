@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useTelegram } from '../../context/TelegramContext';
 
 export function Modal({
   isOpen,
@@ -9,36 +10,50 @@ export function Modal({
   children,
   maxWidth = 'max-w-md',
 }) {
+  const dialogRef = useRef(null);
+  const { setupBackButton } = useTelegram();
+
   useEffect(() => {
-    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (isOpen) {
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      const cleanupBack = setupBackButton(onClose);
+      return () => {
+        cleanupBack();
+        if (dialog.open) dialog.close();
+      };
+    } else {
+      if (dialog.open) dialog.close();
+    }
+  }, [isOpen, onClose, setupBackButton]);
 
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
+  // Handle native Escape key
+  const handleCancel = (e) => {
+    e.preventDefault();
+    onClose();
+  };
 
-    return () => {
-      document.body.style.overflow = originalOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  // Close when clicking the native backdrop outside modal content
+  const handleDialogClick = (e) => {
+    if (e.target === dialogRef.current) {
+      onClose();
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn modal-overlay"
+    <dialog
+      ref={dialogRef}
+      onCancel={handleCancel}
+      onClick={handleDialogClick}
+      className={`fixed inset-0 m-auto p-3 sm:p-4 bg-transparent border-0 rounded-2xl w-full ${maxWidth} max-h-[90vh] overflow-visible focus:outline-none z-50`}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full ${maxWidth} shadow-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content animate-scaleIn`}
-      >
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] modal-content animate-scaleIn text-slate-900 dark:text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -53,6 +68,7 @@ export function Modal({
           </div>
           <button
             onClick={onClose}
+            type="button"
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             aria-label="Закрити"
           >
@@ -63,6 +79,6 @@ export function Modal({
         {/* Body */}
         <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </dialog>
   );
 }

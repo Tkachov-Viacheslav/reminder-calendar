@@ -128,6 +128,23 @@ Deno.serve(async (req: Request) => {
     // 4. Group Chat Processing
     if (isGroupChat) {
       const supabase = getSupabaseClient();
+
+      // Telegram upgrade: звичайна група мігрувала у супергрупу
+      if (message.migrate_to_chat_id) {
+        const oldTeamId = `team_${chatId}`;
+        const newTeamId = `team_${message.migrate_to_chat_id}`;
+        await supabase.from('team_members').update({ team_id: newTeamId }).eq('team_id', oldTeamId);
+        await supabase.from('reminders').update({ team_id: newTeamId }).eq('team_id', oldTeamId);
+        await supabase.from('team_categories').update({ team_id: newTeamId }).eq('team_id', oldTeamId);
+        await supabase.from('team_topics').update({ team_id: newTeamId }).eq('team_id', oldTeamId);
+        await supabase.from('team_category_topics').update({ team_id: newTeamId }).eq('team_id', oldTeamId);
+        await supabase.from('teams').delete().eq('id', oldTeamId);
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       const teamId = await ensureTeamExists(supabase, message.chat, message.from?.id);
 
       if (message.from && !message.from.is_bot) {

@@ -26,25 +26,27 @@ export function TeamMetaEditor({
 
   return (
     <div className="p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200/60 dark:border-violet-900/40 space-y-3">
-      {/* Forum Topic Selector */}
-      <div>
-        <label className="text-xs font-semibold text-violet-950 dark:text-violet-200 flex items-center gap-1.5 mb-1">
-          <Hash className="w-3.5 h-3.5 text-violet-500" />
-          <span>Тема форуму (куди надіслати)</span>
-        </label>
-        <select
-          value={threadId || 0}
-          onChange={(e) => setThreadId(Number(e.target.value) || null)}
-          className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-slate-100 cursor-pointer"
-        >
-          <option value="0">За замовчуванням (з прив'язки категорії)</option>
-          {teamTopics.map((topic) => (
-            <option key={topic.id} value={topic.thread_id}>
-              #{topic.name || `Тема ${topic.thread_id}`}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Forum Topic Selector (Only for forum groups) */}
+      {currentTeam.is_forum && (
+        <div>
+          <label className="text-xs font-semibold text-violet-950 dark:text-violet-200 flex items-center gap-1.5 mb-1">
+            <Hash className="w-3.5 h-3.5 text-violet-500" />
+            <span>Тема форуму (куди надіслати)</span>
+          </label>
+          <select
+            value={threadId || 0}
+            onChange={(e) => setThreadId(Number(e.target.value) || null)}
+            className="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-violet-200 dark:border-violet-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 text-slate-900 dark:text-slate-100 cursor-pointer"
+          >
+            <option value="0">За замовчуванням (з прив'язки категорії)</option>
+            {teamTopics.map((topic) => (
+              <option key={topic.id} value={topic.thread_id}>
+                #{topic.name || `Тема ${topic.thread_id}`}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Tagged Members */}
       <div>

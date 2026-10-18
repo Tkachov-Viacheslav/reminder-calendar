@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -19,30 +19,58 @@ const BORDERS = {
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const popoverRef = useRef(null);
 
   const removeToast = useCallback((id) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const showToast = useCallback((message, type = 'success', duration = 3000) => {
-    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const newToast = { id, message, type };
+  const showToast = useCallback(
+    (message, type = 'success', duration = 3000, action = null) => {
+      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const newToast = { id, message, type, action };
 
-    setToasts((prev) => [...prev.slice(-3), newToast]);
+      setToasts((prev) => [...prev.slice(-3), newToast]);
 
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
+      if (duration > 0) {
+        setTimeout(() => {
+          removeToast(id);
+        }, duration);
+      }
+    },
+    [removeToast]
+  );
+
+  // Synchronize Top Layer Popover state with toasts
+  useEffect(() => {
+    const el = popoverRef.current;
+    if (!el || !el.showPopover) return;
+
+    if (toasts.length > 0) {
+      if (!el.matches?.(':popover-open')) {
+        try {
+          el.showPopover();
+        } catch {}
+      }
+    } else {
+      if (el.matches?.(':popover-open')) {
+        try {
+          el.hidePopover();
+        } catch {}
+      }
     }
-  }, [removeToast]);
+  }, [toasts.length]);
 
   return (
     <ToastContext.Provider value={{ showToast, removeToast }}>
       {children}
 
-      {/* Toast Notification Container */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 w-[90%] max-w-sm pointer-events-none">
+      {/* Toast Notification Container in Top Layer */}
+      <div
+        ref={popoverRef}
+        popover="manual"
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 m-0 p-0 bg-transparent border-0 flex flex-col gap-2 w-[90%] max-w-sm pointer-events-none overflow-visible backdrop:bg-transparent z-50"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -50,16 +78,33 @@ export function ToastProvider({ children }) {
               BORDERS[toast.type] || BORDERS.info
             }`}
           >
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2 truncate flex-1 min-w-0">
               {ICONS[toast.type] || ICONS.info}
               <span className="truncate">{toast.message}</span>
             </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {toast.action && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.action.onClick();
+                    removeToast(toast.id);
+                  }}
+                  className="px-2 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white font-semibold text-[11px] transition-colors"
+                >
+                  {toast.action.label}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                aria-label="Закрити сповіщення"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
         ))}
       </div>

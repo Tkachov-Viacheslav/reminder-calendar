@@ -1,0 +1,248 @@
+import { escapeHtml, getKyivDayRange } from '../utils.ts';
+import { sendBotMessage, getBotChatStatus } from '../telegram.ts';
+import { getSupabaseClient } from '../db.ts';
+import {
+  getUserTeamsWithRoles,
+  formatTeamStatusItem,
+  deleteTeamData,
+} from '../teams.ts';
+
+export async function sendWelcome(
+  chatId: string | number,
+  user: any,
+  botToken: string,
+  siteUrl: string
+) {
+  const name = escapeHtml(user?.first_name || 'друже');
+  const replyText =
+    `👋 <b>Вітаю, ${name}!</b>\n\n` +
+    `Я бот для нагадувань у Календарі.\n\n` +
+    `⚡ <b>Корисні команди:</b>\n` +
+    `• /today — розклад на сьогодні\n` +
+    `• /tomorrow — плани на завтра\n` +
+    `• /week — справи на 7 днів\n` +
+    `• /groups — мої групи та статус бота\n` +
+    `• /code — код для входу в браузері\n\n` +
+    `✍️ <b>Швидке створення:</b> напишіть мені в чат:\n` +
+    `• <i>«10.11 19:00 Сходити в ДНУ»</i>\n` +
+    `• <i>«Завтра о 14:30 дзвінок»</i>\n` +
+    `• <i>«Купити молоко о 20:00»</i>`;
+
+  await sendBotMessage(botToken, chatId, replyText, siteUrl, [
+    [{ text: '🔑 Отримати код для браузера', callback_data: 'get_code' }],
+    [{ text: '👥 Мої групи та статус бота', callback_data: 'my_groups' }],
+  ]);
+}
+
+export async function sendHelp(
+  chatId: string | number,
+  botToken: string,
+  siteUrl: string
+) {
+  const replyText =
+    `💡 <b>Довідка по командах:</b>\n\n` +
+    `📅 <b>/today</b> — переглянути всі справи на сьогодні\n` +
+    `🌅 <b>/tomorrow</b> — справи на завтра\n` +
+    `📆 <b>/week</b> — розклад на найближчі 7 днів\n` +
+    `👥 <b>/groups</b> — перевірити підключені групи та статус прав бота\n` +
+    `🔑 <b>/code</b> — отримати одноразовий код авторизації для ПК\n\n` +
+    `⏰ <b>Створення:</b> просто пишіть текст із датою та часом:\n` +
+    `• <i>Сьогодні о 19:00 тренування</i>\n` +
+    `• <i>15.11 12:00 стоматолог</i>\n\n` +
+    `☀️ <b>Ранковий дайджест:</b> щоранку о 09:00 бот надсилає зведення завдань.`;
+
+  await sendBotMessage(botToken, chatId, replyText, siteUrl, [
+    [{ text: '👥 Мої групи та статус бота', callback_data: 'my_groups' }],
+  ]);
+}
+
+async function getRemindersForRange(chatId: string | number, startIso: string, endIso: string) {
+  const supabase = getSupabaseClient();
+  const { data } = await supabase
+    .from('reminders')
+    .select('*')
+    .eq('user_id', String(chatId))
+    .gte('remind_at', startIso)
+    .lte('remind_at', endIso)
+    .order('remind_at', { ascending: true });
+  return data || [];
+}
+
+function formatRemindersList(reminders: any[], emptyMessage: string) {
+  if (!reminders || reminders.length === 0) {
+    return emptyMessage;
+  }
+  return reminders
+    .map((r) => {
+      const time = new Date(r.remind_at).toLocaleTimeString('uk-UA', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Kyiv',
+      });
+      const check = r.is_sent ? '✅' : '⏳';
+      return `${check} <b>${time}</b> — ${escapeHtml(r.title)}`;
+    })
+    .join('\n');
+}
+
+export async function handleTodayCommand(chatId: string | number, botToken: string, siteUrl: string) {
+  const { startIso, endIso, formattedDate } = getKyivDayRange(0);
+  const reminders = await getRemindersForRange(chatId, startIso, endIso);
+  const list = formatRemindersList(
+    reminders,
+    '🎉 <i>На сьогодні нагадувань немає! Можна відпочити або додати нове.</i>'
+  );
+
+  const replyText =
+    `📅 <b>Ваш розклад на сьогодні (${formattedDate}):</b>\n\n` +
+    list +
+    `\n\n💡 <i>Щоб додати нагадування, напишіть, наприклад:</i>\n«Сьогодні о 19:30 тренування»`;
+
+  await sendBotMessage(botToken, chatId, replyText, siteUrl);
+}
+
+export async function handleTomorrowCommand(chatId: string | number, botToken: string, siteUrl: string) {
+  const { startIso, endIso, formattedDate } = getKyivDayRange(1);
+  const reminders = await getRemindersForRange(chatId, startIso, endIso);
+  const list = formatRemindersList(
+    reminders,
+    '✨ <i>На завтра планів поки що немає. Чудовий привід запланувати щось корисне!</i>'
+  );
+
+  const replyText =
+    `🌅 <b>Ваші плани на завтра (${formattedDate}):</b>\n\n` +
+    list +
+    `\n\n💡 <i>Щоб додати нагадування, напишіть, наприклад:</i>\n«Завтра о 10:00 зустріч»`;
+
+  await sendBotMessage(botToken, chatId, replyText, siteUrl);
+}
+
+export async function handleWeekCommand(chatId: string | number, botToken: string, siteUrl: string) {
+  const todayRange = getKyivDayRange(0);
+  const weekEndRange = getKyivDayRange(6);
+  const reminders = await getRemindersForRange(chatId, todayRange.startIso, weekEndRange.endIso);
+
+  if (!reminders || reminders.length === 0) {
+    const emptyText =
+      `📆 <b>Розклад на найближчі 7 днів:</b>\n\n` +
+      `🌿 <i>На найближчий тиждень завдань не заплановано.</i>\n\n` +
+      `Спробуйте написати боту, щоб додати нагадування:\n«15.11 12:00 стоматолог»`;
+    await sendBotMessage(botToken, chatId, emptyText, siteUrl);
+    return;
+  }
+
+  const byDate: Record<string, any[]> = {};
+  for (const r of reminders) {
+    const dStr = new Date(r.remind_at).toLocaleDateString('uk-UA', {
+      timeZone: 'Europe/Kyiv',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    if (!byDate[dStr]) byDate[dStr] = [];
+    byDate[dStr].push(r);
+  }
+
+  let text = `📆 <b>Ваш розклад на тиждень:</b>\n\n`;
+  for (const [dateStr, list] of Object.entries(byDate)) {
+    text += `📌 <b>${dateStr}</b>\n`;
+    text +=
+      list
+        .map((r) => {
+          const time = new Date(r.remind_at).toLocaleTimeString('uk-UA', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Kyiv',
+          });
+          const check = r.is_sent ? '✅' : '⏳';
+          return `  ${check} ${time} — ${escapeHtml(r.title)}`;
+        })
+        .join('\n') + '\n\n';
+  }
+
+  await sendBotMessage(botToken, chatId, text.trim(), siteUrl);
+}
+
+export async function handleQuickReminder(
+  chatId: string | number,
+  parsed: any,
+  botToken: string,
+  siteUrl: string
+) {
+  const supabase = getSupabaseClient();
+
+  const reminder = {
+    id: `rem-${Date.now()}`,
+    user_id: String(chatId),
+    title: parsed.title,
+    category: 'main',
+    remind_at: parsed.remind_at,
+    is_sent: false,
+    created_at: new Date().toISOString(),
+  };
+
+  await supabase.from('reminders').insert([reminder]);
+
+  const timeFormatted = new Date(parsed.remind_at).toLocaleTimeString('uk-UA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Kyiv',
+  });
+  const dateFormatted = new Date(parsed.remind_at).toLocaleDateString('uk-UA', {
+    timeZone: 'Europe/Kyiv',
+  });
+
+  const replyText =
+    `✅ <b>Нагадування збережено!</b>\n\n` +
+    `📌 <b>${escapeHtml(parsed.title)}</b>\n` +
+    `📅 Дата: <b>${dateFormatted}</b>\n` +
+    `⏰ Час: <b>${timeFormatted}</b>`;
+
+  await sendBotMessage(botToken, chatId, replyText, siteUrl);
+}
+
+export async function handleUserGroupsCommand(
+  chatId: string | number,
+  botToken: string,
+  siteUrl: string
+) {
+  const supabase = getSupabaseClient();
+  const userId = String(chatId);
+  const rawTeamsList = await getUserTeamsWithRoles(supabase, userId);
+
+  const teamButtons: any[][] = [];
+  const lines: string[] = [];
+
+  for (const item of rawTeamsList) {
+    const targetChatId = item.team.telegram_chat_id || item.team.id.replace('team_', '');
+    const chatStatus = await getBotChatStatus(botToken, targetChatId);
+
+    if (!chatStatus.isMember) {
+      await deleteTeamData(supabase, item.team.id);
+      continue;
+    }
+
+    const formatted = formatTeamStatusItem(item, chatStatus, lines.length, siteUrl);
+    lines.push(formatted.line);
+    teamButtons.push(formatted.button);
+  }
+
+  if (lines.length === 0) {
+    const text =
+      `👥 <b>Ваші групи та команди:</b>\n\n` +
+      `Ви поки що не підключені до жодного командного календаря.\n\n` +
+      `👉 <b>Як підключити вашу групу:</b>\n` +
+      `1. Додайте бота <code>@reminderveter_bot</code> у потрібну групу Telegram.\n` +
+      `2. Призначте його <b>Адміністратором</b> чату.\n` +
+      `3. Бот автоматично створить командний календар і він з'явиться тут!`;
+    await sendBotMessage(botToken, chatId, text, siteUrl);
+    return;
+  }
+
+  const text =
+    `👥 <b>Ваші підключені групи (${lines.length}):</b>\n\n` +
+    lines.join('\n\n') +
+    `\n\n💡 <i>Натисніть на групу нижче, щоб відкрити її календар:</i>`;
+
+  await sendBotMessage(botToken, chatId, text, siteUrl, teamButtons);
+}

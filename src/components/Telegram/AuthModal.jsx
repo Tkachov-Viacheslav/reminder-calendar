@@ -232,6 +232,9 @@ export function AuthModal({ isOpen, onClose }) {
                   <form onSubmit={handleCodeLogin} className="space-y-3">
                     <input
                       type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]*"
                       maxLength={6}
                       required
                       value={code}

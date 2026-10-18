@@ -107,13 +107,54 @@ export function tryParseQuickReminder(rawText: string): { title: string; remind_
   const isTomorrow = /\bзавтра\b/i.test(workingText);
   const isDayAfter = /\bпіслязавтра\b/i.test(workingText);
 
+  // Підтримка днів тижня (понеділок, вівторок, середа, четвер, п'ятниця, субота, неділя)
+  const weekdayMatches: Record<number, RegExp> = {
+    1: /\b(?:в|у)?\s*(?:понеділок|пн)\b/iu,
+    2: /\b(?:у|в)?\s*(?:вівторок|вт)\b/iu,
+    3: /\b(?:в|у|в|у)?\s*(?:середу|середа|ср)\b/iu,
+    4: /\b(?:в|у)?\s*(?:четвер|чт)\b/iu,
+    5: /\b(?:в|у|в|у)?\s*(?:п['’]?ятницю|п['’]?ятниця|пт)\b/iu,
+    6: /\b(?:в|у)?\s*(?:суботу|субота|сб)\b/iu,
+    0: /\b(?:в|у)?\s*(?:неділю|неділя|нд)\b/iu,
+  };
+
+  let matchedWeekday: number | null = null;
+  for (const [wd, regex] of Object.entries(weekdayMatches)) {
+    if (regex.test(workingText)) {
+      matchedWeekday = Number(wd);
+      workingText = workingText.replace(regex, ' ');
+      break;
+    }
+  }
+
+  // Підтримка відносного часу: "через 20 хв", "через 2 години"
+  const relativeMatch = workingText.match(/\bчерез\s+(\d+)\s*(хв|хвилин|год|годин|години)\b/iu);
+  if (relativeMatch) {
+    const val = parseInt(relativeMatch[1], 10);
+    const unit = relativeMatch[2].toLowerCase();
+    const addMinutes = unit.startsWith('год') ? val * 60 : val;
+    workingText = workingText.replace(relativeMatch[0], ' ');
+
+    const title = workingText
+      .replace(/(?<!\p{L})(нагадай|нагадати|\/remind|о|об)(?!\p{L})/giu, '')
+      .trim()
+      .replace(/\s+/g, ' ');
+
+    const targetDate = new Date(Date.now() + addMinutes * 60 * 1000);
+    return {
+      title: title || 'Швидке нагадування',
+      remind_at: targetDate.toISOString(),
+    };
+  }
+
   if (
     !fullDateMatch &&
     !shortDateMatch &&
     hours === undefined &&
     !isToday &&
     !isTomorrow &&
-    !isDayAfter
+    !isDayAfter &&
+    matchedWeekday === null
   ) {
     return null;
   }
@@ -135,6 +176,15 @@ export function tryParseQuickReminder(rawText: string): { title: string; remind_
       targetYear += 1;
     }
     workingText = workingText.replace(shortDateMatch[0], ' ');
+  } else if (matchedWeekday !== null) {
+    const curDate = new Date(Date.UTC(now.year, now.month - 1, now.day));
+    const curWd = curDate.getUTCDay();
+    let diff = matchedWeekday - curWd;
+    if (diff <= 0) diff += 7;
+    curDate.setUTCDate(curDate.getUTCDate() + diff);
+    targetYear = curDate.getUTCFullYear();
+    targetMonth = curDate.getUTCMonth() + 1;
+    targetDay = curDate.getUTCDate();
   } else if (isDayAfter) {
     const d = new Date(Date.UTC(now.year, now.month - 1, now.day + 2));
     targetYear = d.getUTCFullYear();

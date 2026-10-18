@@ -1,9 +1,13 @@
 {
+  "id": "/",
   "name": "Календар нагадувань",
   "short_name": "Календар",
   "description": "Сучасний календар з нагадуваннями та синхронізацією з Telegram",
+  "lang": "uk",
+  "categories": ["productivity", "utilities"],
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#0f172a",
   "theme_color": "#4f46e5",
   "orientation": "portrait",
@@ -13,6 +17,32 @@
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Створити нагадування",
+      "short_name": "Нове",
+      "description": "Швидке створення нового нагадування",
+      "url": "/?action=new",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any"
+        }
+      ]
+    },
+    {
+      "name": "Розклад на сьогодні",
+      "short_name": "Сьогодні",
+      "description": "Переглянути справи на сьогодні",
+      "url": "/?action=today",
+      "icons": [
+        {
+          "src": "/favicon.svg",
+          "sizes": "any"
+        }
+      ]
     }
   ]
 }

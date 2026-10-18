@@ -81,17 +81,19 @@ export function TeamSettingsModal({ isOpen, onClose }) {
             <Users className="w-3.5 h-3.5" />
             <span>Учасники ({teamMembers.length})</span>
           </button>
-          <button
-            onClick={() => setActiveTab('topics')}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-all ${
-              activeTab === 'topics'
-                ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Hash className="w-3.5 h-3.5" />
-            <span>Теми форуму</span>
-          </button>
+          {currentTeam.is_forum && (
+            <button
+              onClick={() => setActiveTab('topics')}
+              className={`pb-2.5 px-3 border-b-2 flex items-center gap-1.5 transition-all ${
+                activeTab === 'topics'
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              <Hash className="w-3.5 h-3.5" />
+              <span>Теми форуму</span>
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
@@ -113,7 +115,7 @@ export function TeamSettingsModal({ isOpen, onClose }) {
             />
           )}
 
-          {activeTab === 'topics' && (
+          {activeTab === 'topics' && currentTeam.is_forum && (
             <TeamTopicsTab
               teamTopics={teamTopics}
               addTeamTopic={addTeamTopic}

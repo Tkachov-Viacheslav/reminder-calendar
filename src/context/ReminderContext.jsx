@@ -3,7 +3,11 @@ import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useTelegram } from './TelegramContext';
 import { useTeam } from './TeamContext';
 import { useToast } from './ToastContext';
-import { LOCAL_STORAGE_KEY, LOCAL_STORAGE_CUSTOM_CATEGORIES } from '../utils/constants';
+import { useCategories } from '../hooks/useCategories';
+import { useRemindersRealtime } from '../hooks/useRemindersRealtime';
+import { useOfflineQueue } from '../hooks/useOfflineQueue';
+import { LOCAL_STORAGE_KEY } from '../utils/constants';
+import { getStorageItem, setStorageItem } from '../services/dbStorage';
 
 const ReminderContext = createContext(null);
 
@@ -11,55 +15,45 @@ export function ReminderProvider({ children }) {
   const { user, activeUserId, triggerHaptic } = useTelegram();
   const { activeTeamId } = useTeam();
   const { showToast } = useToast();
-  const [reminders, setReminders] = useState([]);
   const storageKey = activeTeamId ? `${LOCAL_STORAGE_KEY}_${activeTeamId}` : LOCAL_STORAGE_KEY;
-  const categoryStorageKey = activeTeamId
-    ? `reminder_team_categories_${activeTeamId}`
-    : `reminder_custom_categories_${activeUserId || 'guest'}`;
 
-  const [customCategories, setCustomCategories] = useState(() => {
-    try {
-      const stored = localStorage.getItem(categoryStorageKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(categoryStorageKey);
-      setCustomCategories(stored ? JSON.parse(stored) : []);
-    } catch {
-      setCustomCategories([]);
-    }
-  }, [categoryStorageKey]);
-
+  const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewDate, setViewDate] = useState(new Date());
 
-  const loadLocalReminders = useCallback(() => {
+  const {
+    customCategories,
+    fetchCategories,
+    addCustomCategory,
+    deleteCustomCategory,
+  } = useCategories(activeTeamId, activeUserId);
+
+  const loadLocalReminders = useCallback(async () => {
     try {
-      const data = localStorage.getItem(storageKey);
-      if (data) {
-        setReminders(JSON.parse(data));
+      const data = await getStorageItem(storageKey);
+      if (Array.isArray(data) && data.length > 0) {
+        setReminders(data);
       } else {
         const initialDate = new Date();
         initialDate.setHours(initialDate.getHours() + 1, 0, 0, 0);
-        const starter = [{
-          id: `starter-${Date.now()}`,
-          user_id: activeUserId || 'guest',
-          team_id: activeTeamId || null,
-          title: activeTeamId ? 'Ласкаво просимо до командного календаря!' : 'Ласкаво просимо до Календаря!',
-          description: 'Події синхронізуються через Telegram бот.',
-          remind_at: initialDate.toISOString(),
-          category: 'main',
-          is_sent: false,
-          created_at: new Date().toISOString()
-        }];
+        const starter = [
+          {
+            id: `starter-${Date.now()}`,
+            user_id: activeUserId || 'guest',
+            team_id: activeTeamId || null,
+            title: activeTeamId
+              ? 'Ласкаво просимо до командного календаря!'
+              : 'Ласкаво просимо до Календаря!',
+            description: 'Події синхронізуються через Telegram бот.',
+            remind_at: initialDate.toISOString(),
+            category: 'main',
+            is_sent: false,
+            created_at: new Date().toISOString(),
+          },
+        ];
         setReminders(starter);
-        localStorage.setItem(storageKey, JSON.stringify(starter));
+        setStorageItem(storageKey, starter);
       }
     } catch (e) {
       console.error('Failed to load local reminders', e);
@@ -67,46 +61,6 @@ export function ReminderProvider({ children }) {
       setLoading(false);
     }
   }, [activeUserId, activeTeamId, storageKey]);
-
-  const fetchCategories = useCallback(
-    async (remList) => {
-      let serverCats = [];
-      if (isSupabaseConfigured() && supabase) {
-        try {
-          if (activeTeamId) {
-            const { data: catRows } = await supabase
-              .from('team_categories')
-              .select('name')
-              .eq('team_id', activeTeamId);
-            if (catRows) {
-              serverCats = catRows.map((r) => r.name);
-            }
-          } else if (activeUserId) {
-            const { data: catRows } = await supabase
-              .from('user_categories')
-              .select('name')
-              .eq('user_id', activeUserId);
-            if (catRows) {
-              serverCats = catRows.map((r) => r.name);
-            }
-          }
-        } catch (e) {
-          console.error('Failed to fetch categories', e);
-        }
-      }
-
-      const fromReminders = (remList || [])
-        .map((r) => r.category)
-        .filter((c) => c && c !== 'main' && c !== 'other' && c !== 'personal' && c !== 'work');
-
-      const merged = Array.from(new Set([...serverCats, ...fromReminders]));
-      setCustomCategories(merged);
-      try {
-        localStorage.setItem(categoryStorageKey, JSON.stringify(merged));
-      } catch {}
-    },
-    [activeUserId, activeTeamId, categoryStorageKey]
-  );
 
   const fetchReminders = useCallback(async () => {
     setLoading(true);
@@ -129,6 +83,7 @@ export function ReminderProvider({ children }) {
       if (error) throw error;
       const list = data || [];
       setReminders(list);
+      setStorageItem(storageKey, list);
       fetchCategories(list);
     } catch (err) {
       console.error('Supabase fetch error, fallback to local', err);
@@ -136,7 +91,7 @@ export function ReminderProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [activeUserId, activeTeamId, loadLocalReminders, fetchCategories]);
+  }, [activeUserId, activeTeamId, storageKey, loadLocalReminders, fetchCategories]);
 
   useEffect(() => {
     fetchReminders();
@@ -156,47 +111,54 @@ export function ReminderProvider({ children }) {
     };
   }, [fetchReminders]);
 
-  // Realtime subscription for instant sync from Telegram bot and team members
+  // Realtime handlers with deduplication
+  const handleRealtimeInsert = useCallback((newRec) => {
+    setReminders((prev) => {
+      if (prev.some((r) => r.id === newRec.id)) return prev;
+      return [...prev, newRec].sort((a, b) => new Date(a.remind_at) - new Date(b.remind_at));
+    });
+  }, []);
+
+  const handleRealtimeUpdate = useCallback((newRec) => {
+    setReminders((prev) => prev.map((r) => (r.id === newRec.id ? { ...r, ...newRec } : r)));
+  }, []);
+
+  const handleRealtimeDelete = useCallback((oldId) => {
+    setReminders((prev) => prev.filter((r) => r.id !== oldId));
+  }, []);
+
+  useRemindersRealtime({
+    activeTeamId,
+    activeUserId,
+    onInsert: handleRealtimeInsert,
+    onUpdate: handleRealtimeUpdate,
+    onDelete: handleRealtimeDelete,
+  });
+
+  const { isOnline, pendingCount, enqueueMutation } = useOfflineQueue({
+    onSyncSuccess: fetchReminders,
+  });
+
+  // Modern App Badging API: update home screen badge count
   useEffect(() => {
-    if (!isSupabaseConfigured() || !supabase) return;
+    if (typeof navigator === 'undefined' || !('setAppBadge' in navigator)) return;
 
-    const channelName = `realtime-reminders-${activeTeamId || activeUserId || 'guest'}`;
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'reminders' },
-        (payload) => {
-          const { eventType, new: newRec, old: oldRec } = payload;
-          const isCurrentScope = activeTeamId
-            ? newRec?.team_id === activeTeamId || oldRec?.team_id === activeTeamId
-            : (!newRec?.team_id && (!activeUserId || newRec?.user_id === activeUserId)) ||
-              (!oldRec?.team_id && (!activeUserId || oldRec?.user_id === activeUserId));
+    try {
+      const todayStr = new Date().toDateString();
+      const todayPending = reminders.filter((r) => {
+        if (r.is_sent) return false;
+        if (!r.remind_at) return false;
+        return new Date(r.remind_at).toDateString() === todayStr;
+      }).length;
 
-          if (!isCurrentScope) return;
-
-          if (eventType === 'INSERT' && newRec) {
-            setReminders((prev) => {
-              if (prev.some((r) => r.id === newRec.id)) return prev;
-              return [...prev, newRec].sort(
-                (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
-              );
-            });
-          } else if (eventType === 'UPDATE' && newRec) {
-            setReminders((prev) =>
-              prev.map((r) => (r.id === newRec.id ? { ...r, ...newRec } : r))
-            );
-          } else if (eventType === 'DELETE' && oldRec) {
-            setReminders((prev) => prev.filter((r) => r.id !== oldRec.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeTeamId, activeUserId]);
+      const totalBadge = todayPending + (pendingCount || 0);
+      if (totalBadge > 0) {
+        navigator.setAppBadge(totalBadge).catch(() => {});
+      } else {
+        navigator.clearAppBadge().catch(() => {});
+      }
+    } catch {}
+  }, [reminders, pendingCount]);
 
   const addReminder = useCallback(
     async (item) => {
@@ -211,11 +173,14 @@ export function ReminderProvider({ children }) {
         created_at: new Date().toISOString(),
       };
 
-      if (isSupabaseConfigured() && supabase) {
+      let savedRemotely = false;
+
+      if (isOnline && isSupabaseConfigured() && supabase) {
         try {
           const { data, error } = await supabase.from('reminders').insert([newReminder]).select();
           if (error) throw error;
           if (data?.[0]) {
+            savedRemotely = true;
             setReminders((prev) => {
               if (prev.some((r) => r.id === data[0].id)) return prev;
               return [...prev, data[0]].sort(
@@ -226,9 +191,13 @@ export function ReminderProvider({ children }) {
             return data[0];
           }
         } catch (e) {
-          console.error('Error saving to Supabase, saving locally', e);
-          showToast('Збережено в локальному сховищі', 'info');
+          console.warn('Network issue saving to Supabase, queuing mutation', e);
         }
+      }
+
+      // Якщо офлайн або запит не пройшов — зберігаємо в локальну чергу на синхронізацію
+      if (!savedRemotely && isSupabaseConfigured()) {
+        enqueueMutation('insert', newReminder);
       }
 
       setReminders((prev) => {
@@ -239,22 +208,33 @@ export function ReminderProvider({ children }) {
         localStorage.setItem(storageKey, JSON.stringify(updated));
         return updated;
       });
-      showToast('Нагадування створено', 'success');
+
+      showToast(
+        !isOnline ? 'Збережено офлайн (синхронізується в мережі)' : 'Нагадування створено',
+        !isOnline ? 'info' : 'success'
+      );
       return newReminder;
     },
-    [activeUserId, activeTeamId, user, storageKey, triggerHaptic, showToast]
+    [activeUserId, activeTeamId, user, storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
   );
 
   const updateReminder = useCallback(
     async (id, updates) => {
       triggerHaptic('light');
-      if (isSupabaseConfigured() && supabase) {
+      let updatedRemotely = false;
+
+      if (isOnline && isSupabaseConfigured() && supabase) {
         try {
           const { error } = await supabase.from('reminders').update(updates).eq('id', id);
           if (error) throw error;
+          updatedRemotely = true;
         } catch (e) {
-          console.error('Error updating in Supabase', e);
+          console.warn('Network issue updating in Supabase, queuing mutation', e);
         }
+      }
+
+      if (!updatedRemotely && isSupabaseConfigured()) {
+        enqueueMutation('update', { id, updates });
       }
 
       setReminders((prev) => {
@@ -271,102 +251,69 @@ export function ReminderProvider({ children }) {
         showToast('Зміни збережено', 'success');
       }
     },
-    [storageKey, triggerHaptic, showToast]
+    [storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
   );
 
   const deleteReminder = useCallback(
     async (id) => {
       triggerHaptic('medium');
-      if (isSupabaseConfigured() && supabase) {
-        try {
-          const { error } = await supabase.from('reminders').delete().eq('id', id);
-          if (error) throw error;
-        } catch (e) {
-          console.error('Error deleting from Supabase', e);
-        }
-      }
+      const targetReminder = reminders.find((r) => r.id === id);
+      if (!targetReminder) return;
 
+      // Оптимістично видаляємо з локального стану
       setReminders((prev) => {
         const updated = prev.filter((r) => r.id !== id);
         localStorage.setItem(storageKey, JSON.stringify(updated));
         return updated;
       });
-      showToast('Нагадування видалено', 'info');
-    },
-    [storageKey, triggerHaptic, showToast]
-  );
 
-  const addCustomCategory = useCallback(
-    async (name) => {
-      const trimmed = String(name || '').trim();
-      if (!trimmed || customCategories.includes(trimmed)) return;
+      let wasCancelled = false;
+      let deleteTimeoutId = null;
 
-      setCustomCategories((prev) => {
-        const updated = [...prev, trimmed];
-        try {
-          localStorage.setItem(categoryStorageKey, JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-
-      if (isSupabaseConfigured() && supabase) {
-        try {
-          if (activeTeamId) {
-            await supabase.from('team_categories').insert({
-              team_id: activeTeamId,
-              name: trimmed,
-            });
-          } else if (activeUserId) {
-            await supabase.from('user_categories').insert({
-              user_id: activeUserId,
-              name: trimmed,
-            });
+      const executeDelete = async () => {
+        if (wasCancelled) return;
+        let deletedRemotely = false;
+        if (isOnline && isSupabaseConfigured() && supabase) {
+          try {
+            const { error } = await supabase.from('reminders').delete().eq('id', id);
+            if (error) throw error;
+            deletedRemotely = true;
+          } catch (e) {
+            console.warn('Network issue deleting from Supabase, queuing mutation', e);
           }
-        } catch (e) {
-          console.error('Error inserting category into Supabase', e);
         }
-      }
-    },
-    [customCategories, activeUserId, activeTeamId, categoryStorageKey]
-  );
-
-  const deleteCustomCategory = useCallback(
-    async (name) => {
-      setCustomCategories((prev) => {
-        const updated = prev.filter((c) => c !== name);
-        try {
-          localStorage.setItem(categoryStorageKey, JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-
-      if (isSupabaseConfigured() && supabase) {
-        try {
-          if (activeTeamId) {
-            await supabase
-              .from('team_categories')
-              .delete()
-              .eq('team_id', activeTeamId)
-              .eq('name', name);
-
-            await supabase
-              .from('team_category_topics')
-              .delete()
-              .eq('team_id', activeTeamId)
-              .eq('category', String(name).toLowerCase().trim());
-          } else if (activeUserId) {
-            await supabase
-              .from('user_categories')
-              .delete()
-              .eq('user_id', activeUserId)
-              .eq('name', name);
-          }
-        } catch (e) {
-          console.error('Error deleting category from Supabase', e);
+        if (!deletedRemotely && isSupabaseConfigured()) {
+          enqueueMutation('delete', { id });
         }
-      }
+      };
+
+      // Даємо 5 секунд на скасування видалення (Undo)
+      deleteTimeoutId = setTimeout(executeDelete, 5000);
+
+      showToast(
+        `Нагадування «${targetReminder.title}» видалено`,
+        'info',
+        5000,
+        {
+          label: '↩️ Скасувати',
+          onClick: () => {
+            wasCancelled = true;
+            clearTimeout(deleteTimeoutId);
+            triggerHaptic('success');
+            setReminders((prev) => {
+              if (prev.some((r) => r.id === id)) return prev;
+              const restored = [...prev, targetReminder].sort(
+                (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
+              );
+              localStorage.setItem(storageKey, JSON.stringify(restored));
+              return restored;
+            });
+            showToast('Нагадування відновлено', 'success');
+          },
+        }
+      );
     },
-    [activeUserId, activeTeamId, categoryStorageKey]
+    [reminders, storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
   );
 
   return (
@@ -375,6 +322,8 @@ export function ReminderProvider({ children }) {
         reminders,
         customCategories,
         loading,
+        isOnline,
+        pendingSyncCount: pendingCount,
         selectedDate,
         setSelectedDate,
         viewDate,

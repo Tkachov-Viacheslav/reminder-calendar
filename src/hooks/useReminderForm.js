@@ -230,6 +230,19 @@ export function useReminderForm({
     }
   };
 
+  const applyTemplate = useCallback(
+    (template) => {
+      triggerHaptic('light');
+      if (template.title) setTitle(template.title);
+      if (template.description) setDescription(template.description);
+      if (template.category) setCategory(template.category);
+      if (template.repeatType) setRepeatType(template.repeatType);
+      if (template.remindBefore !== undefined) setRemindBefore(template.remindBefore);
+      if (Array.isArray(template.items)) setItems([...template.items]);
+    },
+    [triggerHaptic]
+  );
+
   return {
     title,
     setTitle,
@@ -252,6 +265,7 @@ export function useReminderForm({
     error,
     setError,
     isSubmitting,
+    applyTemplate,
     handleToggleMemberTag,
     handleAddCustomTag,
     handleRemoveTagged,

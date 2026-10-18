@@ -22,18 +22,27 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
     canEdit,
     switchWorkspace,
   } = useTeam();
-  const [isSwitcherOpen, setIsSwitcherOpen] = useState(false);
-  const switcherRef = useRef(null);
+  const popoverRef = useRef(null);
+  const buttonRef = useRef(null);
+  const [popoverCoords, setPopoverCoords] = useState({ top: 0, left: 0 });
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (switcherRef.current && !switcherRef.current.contains(e.target)) {
-        setIsSwitcherOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', handleClickOutside);
-    return () => document.removeEventListener('pointerdown', handleClickOutside);
-  }, []);
+  const toggleSwitcher = () => {
+    const popover = popoverRef.current;
+    const button = buttonRef.current;
+    if (!popover || !button) return;
+
+    if (popover.matches?.(':popover-open')) {
+      popover.hidePopover?.();
+    } else {
+      const rect = button.getBoundingClientRect();
+      setPopoverCoords({ top: rect.bottom + 8, left: rect.left });
+      popover.showPopover?.();
+    }
+  };
+
+  const closeSwitcher = () => {
+    popoverRef.current?.hidePopover?.();
+  };
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
@@ -46,9 +55,11 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-md shadow-indigo-500/20 shrink-0 select-none object-contain"
           />
 
-          <div className="relative min-w-0 max-w-[150px] xs:max-w-[180px] sm:max-w-[240px]" ref={switcherRef}>
+          <div className="relative min-w-0 max-w-[150px] xs:max-w-[180px] sm:max-w-[240px]">
             <button
-              onClick={() => setIsSwitcherOpen((prev) => !prev)}
+              ref={buttonRef}
+              type="button"
+              onClick={toggleSwitcher}
               className="w-full flex items-center gap-1.5 px-2 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left"
             >
               <div className="leading-tight min-w-0 flex-1">
@@ -64,41 +75,48 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
               </div>
             </button>
 
-            {/* Dropdown Menu */}
-            {isSwitcherOpen && (
-              <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-1.5 animate-fadeIn text-xs">
-                {/* Personal Option */}
-                <button
-                  onClick={() => {
-                    switchWorkspace(null);
-                    setIsSwitcherOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all ${
-                    !activeTeamId
-                      ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-indigo-500" />
-                    <span>Особистий календар</span>
-                  </div>
-                  {!activeTeamId && <Check className="w-4 h-4 text-indigo-600" />}
-                </button>
+            {/* Native Popover Menu */}
+            <div
+              ref={popoverRef}
+              id="workspace-switcher-popover"
+              popover="auto"
+              style={{ top: `${popoverCoords.top}px`, left: `${popoverCoords.left}px` }}
+              className="fixed m-0 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 p-1.5 text-xs backdrop:bg-transparent"
+            >
+              {/* Personal Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  switchWorkspace(null);
+                  closeSwitcher();
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all ${
+                  !activeTeamId
+                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-indigo-500" />
+                  <span>Особистий календар</span>
+                </div>
+                {!activeTeamId && <Check className="w-4 h-4 text-indigo-600" />}
+              </button>
 
-                {/* Teams List */}
-                {userTeams.length > 0 && (
-                  <>
-                    <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Команди
-                    </div>
-                    {userTeams.map((team) => (
-                      <button
-                        key={team.id}
-                        onClick={() => {
-                          switchWorkspace(team.id);
-                          setIsSwitcherOpen(false);
-                        }}
+              {/* Teams List */}
+              {userTeams.length > 0 && (
+                <>
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Команди
+                  </div>
+                  {userTeams.map((team) => (
+                    <button
+                      key={team.id}
+                      type="button"
+                      onClick={() => {
+                        switchWorkspace(team.id);
+                        closeSwitcher();
+                      }}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all ${
                           activeTeamId === team.id
                             ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold'
@@ -112,10 +130,9 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
                         {activeTeamId === team.id && <Check className="w-4 h-4 text-indigo-600" />}
                       </button>
                     ))}
-                  </>
-                )}
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Team Settings Gear (if in team and admin) */}

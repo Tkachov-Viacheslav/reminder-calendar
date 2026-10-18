@@ -144,7 +144,7 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
       </div>
 
       {/* List or Empty State */}
-      <div className="flex-1 overflow-y-auto my-2.5 space-y-2.5 max-h-[440px] pr-1">
+      <div className="flex-1 overflow-y-auto my-2.5 space-y-2.5 max-h-[440px] pr-1 @container">
         {filteredList.length === 0 ? (
           <div className="py-8 px-4 text-center flex flex-col items-center justify-center">
             <div className="p-3 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-500 mb-2.5">

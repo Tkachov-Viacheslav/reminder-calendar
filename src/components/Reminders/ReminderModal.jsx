@@ -4,10 +4,12 @@ import { useTelegram } from '../../context/TelegramContext';
 import { useTeam } from '../../context/TeamContext';
 import { useReminders } from '../../context/ReminderContext';
 import { useReminderForm } from '../../hooks/useReminderForm';
+import { useReminderTemplates } from '../../hooks/useReminderTemplates';
 import { Modal, Button, Input, Select } from '../ui';
 import { CategoryChips } from './CategoryChips';
 import { ChecklistEditor } from './ChecklistEditor';
 import { TeamMetaEditor } from './TeamMetaEditor';
+import { TemplateSelector } from './TemplateSelector';
 
 export function ReminderModal({
   isOpen,
@@ -36,6 +38,22 @@ export function ReminderModal({
     onClose,
   });
 
+  const { templates, saveTemplate, deleteTemplate } = useReminderTemplates(
+    currentTeam?.id,
+    currentTeam ? null : undefined
+  );
+
+  const handleSaveCurrentAsTemplate = () => {
+    saveTemplate({
+      title: form.title,
+      category: form.category,
+      description: form.description,
+      remindBefore: form.remindBefore,
+      repeatType: form.repeatType,
+      items: form.items,
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -57,6 +75,17 @@ export function ReminderModal({
           <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-medium border border-rose-200 dark:border-rose-900">
             {form.error}
           </div>
+        )}
+
+        {/* User Created Templates */}
+        {!editingReminder && (
+          <TemplateSelector
+            templates={templates}
+            onApplyTemplate={form.applyTemplate}
+            onSaveCurrentAsTemplate={handleSaveCurrentAsTemplate}
+            onDeleteTemplate={deleteTemplate}
+            currentTitle={form.title}
+          />
         )}
 
         {/* Title */}
