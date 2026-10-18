@@ -18,6 +18,13 @@ function formatCategoryTag(cat?: string | null): string {
   return clean || 'інше';
 }
 
+function escapeHtml(text: string): string {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function getNextRepeatDate(currentIso: string, repeatType: string): string | null {
   const date = new Date(currentIso);
   if (repeatType === 'daily') {
@@ -111,15 +118,15 @@ async function sendTelegramAlert(botToken: string, chatId: string, reminder: any
 
   let checklistText = '';
   if (Array.isArray(reminder.items) && reminder.items.length > 0) {
-    const lines = reminder.items.map((it: any) => `${it.done ? '☑️' : '▫️'} ${it.text}`);
+    const lines = reminder.items.map((it: any) => `${it.done ? '☑️' : '▫️'} ${escapeHtml(it.text)}`);
     checklistText = `\n📋 <b>Підзавдання:</b>\n` + lines.join('\n');
   }
 
   const message = [
     `🔔 <b>Нагадування!</b>`,
     ``,
-    `📌 <b>${reminder.title}</b>`,
-    reminder.description ? `📝 ${reminder.description}` : '',
+    `📌 <b>${escapeHtml(reminder.title)}</b>`,
+    reminder.description ? `📝 ${escapeHtml(reminder.description)}` : '',
     checklistText,
     `⏰ Час: <b>${timeFormatted}</b>${repeatInfo}`,
     `🏷 Категорія: #${categoryTag}`,
@@ -196,7 +203,7 @@ async function handleMorningDigests(supabase: any, botToken: string, siteUrl: st
           timeZone: 'Europe/Kyiv',
         });
         const status = r.is_sent ? '✅' : '⏰';
-        return `${idx + 1}. ${status} <b>${time}</b> — ${r.title}`;
+        return `${idx + 1}. ${status} <b>${time}</b> — ${escapeHtml(r.title)}`;
       })
       .join('\n');
 

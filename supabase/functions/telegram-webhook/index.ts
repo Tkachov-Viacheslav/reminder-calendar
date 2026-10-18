@@ -9,6 +9,13 @@ function getSupabaseClient() {
   return createClient(url, key);
 }
 
+function escapeHtml(text: string): string {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 async function generateAndSaveCode(chatId: string | number, user: any) {
   const supabase = getSupabaseClient();
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -75,7 +82,7 @@ async function sendAuthCode(chatId: string | number, user: any, botToken: string
 }
 
 async function sendWelcome(chatId: string | number, user: any, botToken: string, siteUrl: string) {
-  const name = user?.first_name || 'друже';
+  const name = escapeHtml(user?.first_name || 'друже');
   const replyText =
     `👋 <b>Вітаю, ${name}!</b>\n\n` +
     `Я бот для нагадувань у Календарі.\n\n` +
@@ -432,7 +439,7 @@ async function handleQuickReminder(chatId: string | number, parsed: any, botToke
 
   const replyText =
     `✅ <b>Нагадування збережено!</b>\n\n` +
-    `📌 <b>${parsed.title}</b>\n` +
+    `📌 <b>${escapeHtml(parsed.title)}</b>\n` +
     `📅 Дата: <b>${dateFormatted}</b>\n` +
     `⏰ Час: <b>${timeFormatted}</b>`;
 

@@ -117,7 +117,7 @@ export function AuthModal({ isOpen, onClose }) {
                     {user?.photo_url ? (
                       <img src={user.photo_url} alt={user?.first_name} className="w-full h-full object-cover" />
                     ) : (
-                      user?.first_name?.[0] || 'U'
+                      [...(user?.first_name || 'U')][0]
                     )}
                   </div>
                   <div>
