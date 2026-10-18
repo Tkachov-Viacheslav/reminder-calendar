@@ -4,7 +4,12 @@ import { MONTH_NAMES_UA } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
 import { Button } from '../ui';
 
-export function CalendarHeader({ viewDate, onPrevMonth, onNextMonth, onGoToday }) {
+export const CalendarHeader = React.memo(function CalendarHeader({
+  viewDate,
+  onPrevMonth,
+  onNextMonth,
+  onGoToday,
+}) {
   const { triggerHaptic } = useTelegram();
   const year = viewDate.getFullYear();
   const monthIndex = viewDate.getMonth();
@@ -65,4 +70,4 @@ export function CalendarHeader({ viewDate, onPrevMonth, onNextMonth, onGoToday }
       </div>
     </div>
   );
-}
+});

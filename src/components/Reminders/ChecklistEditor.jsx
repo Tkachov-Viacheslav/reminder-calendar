@@ -3,6 +3,7 @@ import { ListTodo, Check, X, Plus } from 'lucide-react';
 
 export function ChecklistEditor({ items = [], onAddItem, onToggleItem, onDeleteItem }) {
   const [newItemText, setNewItemText] = useState('');
+  const safeItems = Array.isArray(items) ? items : [];
 
   const handleSubmit = (e) => {
     if (e) e.preventDefault();
@@ -12,7 +13,7 @@ export function ChecklistEditor({ items = [], onAddItem, onToggleItem, onDeleteI
     setNewItemText('');
   };
 
-  const completedCount = items.filter((i) => i.done).length;
+  const completedCount = safeItems.filter((i) => i?.done).length;
 
   return (
     <div>
@@ -21,17 +22,17 @@ export function ChecklistEditor({ items = [], onAddItem, onToggleItem, onDeleteI
           <ListTodo className="w-3.5 h-3.5 text-indigo-500" />
           <span>Підзавдання / Чек-лист</span>
         </label>
-        {items.length > 0 && (
+        {safeItems.length > 0 && (
           <span className="text-[11px] text-slate-400">
-            {completedCount}/{items.length}
+            {completedCount}/{safeItems.length}
           </span>
         )}
       </div>
 
       {/* Items list */}
-      {items.length > 0 && (
+      {safeItems.length > 0 && (
         <div className="space-y-1.5 mb-2 max-h-32 overflow-y-auto pr-1">
-          {items.map((it) => (
+          {safeItems.map((it) => (
             <div
               key={it.id}
               className="flex items-center gap-2 p-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs"

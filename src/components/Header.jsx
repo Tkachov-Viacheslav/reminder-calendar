@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Calendar as CalendarIcon,
   KeyRound,
   Plus,
   ChevronDown,
@@ -41,9 +40,11 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo and Workspace Switcher */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 text-white shadow-md shadow-indigo-500/20 shrink-0">
-            <CalendarIcon className="w-5 h-5" />
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="Нагадування"
+            className="w-9 h-9 rounded-xl shadow-md shadow-indigo-500/20 shrink-0 select-none object-contain"
+          />
 
           <div className="relative" ref={switcherRef}>
             <button

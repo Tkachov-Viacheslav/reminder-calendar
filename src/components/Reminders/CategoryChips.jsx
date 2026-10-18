@@ -11,6 +11,9 @@ export function CategoryChips({
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
+  const safeCustom = Array.isArray(customCategories)
+    ? customCategories.filter((c) => Boolean(c && String(c).trim()))
+    : [];
 
   const handleAddSubmit = (e) => {
     if (e) e.preventDefault();
@@ -55,7 +58,7 @@ export function CategoryChips({
         })}
 
         {/* Custom Categories */}
-        {customCategories.map((catName) => {
+        {safeCustom.map((catName) => {
           const meta = getCategoryMeta(catName);
           const isSelected = category === catName;
           return (
