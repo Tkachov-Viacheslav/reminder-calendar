@@ -52,6 +52,8 @@ Deno.serve(async (req: Request) => {
     // Burn on use: single-use code
     await supabase.from('auth_codes').delete().eq('id', data.id);
 
+    const photoUrl = data.photo_url || (data.username ? `https://t.me/i/userpic/320/${data.username}.jpg` : '');
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -59,6 +61,7 @@ Deno.serve(async (req: Request) => {
           id: data.telegram_id,
           first_name: data.first_name,
           username: data.username,
+          photo_url: photoUrl,
         },
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
