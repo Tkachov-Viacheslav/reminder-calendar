@@ -103,11 +103,11 @@ function CalendarContent() {
 
         {/* Active Team Workspace Banner */}
         {currentTeam && (
-          <div className="flex items-center justify-between p-3 rounded-xl bg-violet-50/90 dark:bg-violet-950/50 border border-violet-200/80 dark:border-violet-900/60 text-xs">
-            <div className="flex items-center gap-2 text-violet-950 dark:text-violet-200">
+          <div className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-violet-50/90 dark:bg-violet-950/50 border border-violet-200/80 dark:border-violet-900/60 text-xs overflow-hidden">
+            <div className="flex items-center gap-2 text-violet-950 dark:text-violet-200 min-w-0 flex-1">
               <Users className="w-4 h-4 text-violet-500 shrink-0" />
-              <span>
-                Командний календар: <strong>{currentTeam.title}</strong>
+              <span className="truncate">
+                Командний календар: <strong className="font-semibold">{currentTeam.title}</strong>
                 {!canEdit && ' (Режим перегляду)'}
               </span>
             </div>

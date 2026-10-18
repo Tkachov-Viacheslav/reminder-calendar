@@ -37,29 +37,29 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
         {/* Logo and Workspace Switcher */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">
           <img
             src="/favicon.svg"
             alt="Нагадування"
-            className="w-9 h-9 rounded-xl shadow-md shadow-indigo-500/20 shrink-0 select-none object-contain"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-md shadow-indigo-500/20 shrink-0 select-none object-contain"
           />
 
-          <div className="relative" ref={switcherRef}>
+          <div className="relative min-w-0 max-w-[150px] xs:max-w-[180px] sm:max-w-[240px]" ref={switcherRef}>
             <button
               onClick={() => setIsSwitcherOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left"
+              className="w-full flex items-center gap-1.5 px-2 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left"
             >
-              <div className="leading-tight">
-                <div className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">
+              <div className="leading-tight min-w-0 flex-1">
+                <div className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">
                   Простір
                 </div>
-                <div className="font-bold text-sm sm:text-base flex items-center gap-1.5 text-slate-900 dark:text-slate-100">
-                  <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                <div className="font-bold text-xs sm:text-sm md:text-base flex items-center gap-1 text-slate-900 dark:text-slate-100 min-w-0">
+                  <span className="truncate block">
                     {currentTeam ? currentTeam.title : 'Особистий'}
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 </div>
               </div>
             </button>
@@ -131,11 +131,11 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
         </div>
 
         {/* Action badges and buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {/* Auth / Profile button */}
           <button
             onClick={onOpenAuth}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
               isAuthenticated
                 ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100'
                 : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60 hover:bg-indigo-100'
@@ -145,13 +145,13 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
             {isAuthenticated ? (
               <>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                <span className="max-w-[100px] sm:max-w-[130px] truncate">
+                <span className="max-w-[75px] xs:max-w-[100px] sm:max-w-[130px] truncate">
                   {user?.first_name || 'Профіль'}
                 </span>
               </>
             ) : (
               <>
-                <KeyRound className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <KeyRound className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                 <span>Увійти</span>
               </>
             )}

@@ -162,12 +162,14 @@ export function ReminderModal({
 
         {/* Actions */}
         <div className="pt-2 flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose} disabled={form.isSubmitting}>
             Скасувати
           </Button>
           <Button
             type="submit"
             variant="primary"
+            loading={form.isSubmitting}
+            disabled={form.isSubmitting}
             icon={<Check className="w-4 h-4" />}
           >
             {editingReminder ? 'Зберегти зміни' : 'Зберегти нагадування'}

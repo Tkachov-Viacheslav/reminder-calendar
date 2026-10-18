@@ -216,7 +216,12 @@ export function ReminderProvider({ children }) {
           const { data, error } = await supabase.from('reminders').insert([newReminder]).select();
           if (error) throw error;
           if (data?.[0]) {
-            setReminders((prev) => [...prev, data[0]]);
+            setReminders((prev) => {
+              if (prev.some((r) => r.id === data[0].id)) return prev;
+              return [...prev, data[0]].sort(
+                (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
+              );
+            });
             showToast('Нагадування створено', 'success');
             return data[0];
           }
@@ -227,7 +232,10 @@ export function ReminderProvider({ children }) {
       }
 
       setReminders((prev) => {
-        const updated = [...prev, newReminder];
+        if (prev.some((r) => r.id === newReminder.id)) return prev;
+        const updated = [...prev, newReminder].sort(
+          (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
+        );
         localStorage.setItem(storageKey, JSON.stringify(updated));
         return updated;
       });

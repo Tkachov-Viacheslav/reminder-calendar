@@ -35,7 +35,7 @@ export async function recordTeamMember(supabase: any, teamId: string, user: any,
 
   let { data: existing } = await supabase
     .from('team_members')
-    .select('id, role, telegram_id')
+    .select('id, role, telegram_id, first_name, username')
     .eq('team_id', teamId)
     .eq('telegram_id', userId)
     .maybeSingle();
@@ -44,7 +44,7 @@ export async function recordTeamMember(supabase: any, teamId: string, user: any,
   if (!existing && cleanUsername) {
     const { data: placeholder } = await supabase
       .from('team_members')
-      .select('id, role, telegram_id')
+      .select('id, role, telegram_id, first_name, username')
       .eq('team_id', teamId)
       .ilike('username', cleanUsername)
       .maybeSingle();
@@ -59,23 +59,36 @@ export async function recordTeamMember(supabase: any, teamId: string, user: any,
       team_id: teamId,
       telegram_id: userId,
       first_name: user.first_name || '',
-      username: user.username || '',
+      username: (user.username || '').replace(/^@/, ''),
       role: forceAdmin ? 'admin' : 'editor',
     });
   } else {
-    const updates: any = {
-      telegram_id: userId,
-      first_name: user.first_name || '',
-      username: user.username || '',
-      updated_at: new Date().toISOString(),
-    };
-    if (forceAdmin && existing.role !== 'admin') {
-      updates.role = 'admin';
+    const cleanUsername = (user.username || '').replace(/^@/, '');
+    const newFirstName = user.first_name || '';
+    const shouldPromoteAdmin = forceAdmin && existing.role !== 'admin';
+
+    // Оновлюємо рядок ЛИШЕ якщо змінилося ім'я, юзернейм або роль, щоб не спамити PATCH у базу
+    const hasDataChanged =
+      existing.first_name !== newFirstName ||
+      existing.username !== cleanUsername ||
+      existing.telegram_id !== userId ||
+      shouldPromoteAdmin;
+
+    if (hasDataChanged) {
+      const updates: any = {
+        telegram_id: userId,
+        first_name: newFirstName,
+        username: cleanUsername,
+        updated_at: new Date().toISOString(),
+      };
+      if (shouldPromoteAdmin) {
+        updates.role = 'admin';
+      }
+      await supabase
+        .from('team_members')
+        .update(updates)
+        .eq('id', existing.id);
     }
-    await supabase
-      .from('team_members')
-      .update(updates)
-      .eq('id', existing.id);
   }
 }
 

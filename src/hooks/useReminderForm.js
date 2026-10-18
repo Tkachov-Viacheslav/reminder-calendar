@@ -35,6 +35,7 @@ export function useReminderForm({
   const [threadId, setThreadId] = useState(null);
   const [taggedMembers, setTaggedMembers] = useState([]);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isInitializedRef = useRef(false);
   const editingIdRef = useRef(null);
@@ -172,8 +173,10 @@ export function useReminderForm({
     triggerHaptic('light');
   }, [category, deleteCustomCategory, triggerHaptic]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!title.trim()) {
       setError('Будь ласка, вкажіть назву нагадування');
       triggerHaptic('error');
@@ -203,21 +206,28 @@ export function useReminderForm({
       return;
     }
 
+    setIsSubmitting(true);
     triggerHaptic('success');
-    onSave({
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      remind_at: remindAtDate.toISOString(),
-      repeat_type: repeatType,
-      remind_before: Number(remindBefore || 0),
-      items,
-      thread_id: threadId ? Number(threadId) : null,
-      tagged_members: taggedMembers,
-      ...(editingReminder ? { is_sent: false } : {}),
-    });
 
-    onClose();
+    try {
+      await onSave({
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        remind_at: remindAtDate.toISOString(),
+        repeat_type: repeatType,
+        remind_before: Number(remindBefore || 0),
+        items,
+        thread_id: threadId ? Number(threadId) : null,
+        tagged_members: taggedMembers,
+        ...(editingReminder ? { is_sent: false } : {}),
+      });
+      onClose();
+    } catch (err) {
+      console.error('Failed to save reminder:', err);
+      setError('Не вдалося зберегти нагадування. Спробуйте ще раз.');
+      setIsSubmitting(false);
+    }
   };
 
   return {
@@ -241,6 +251,7 @@ export function useReminderForm({
     taggedMembers,
     error,
     setError,
+    isSubmitting,
     handleToggleMemberTag,
     handleAddCustomTag,
     handleRemoveTagged,
