@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8785054597:AAEnDmyEKpNqHbT1hGyKMyc9Jkt5QCPoLUk';
+const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '';
 const SITE_URL = Deno.env.get('SITE_URL') || 'https://reminder-calendar-seven.vercel.app';
 
 function getSupabaseClient() {
@@ -307,10 +307,10 @@ function tryParseQuickReminder(text: string) {
 
   let hours: number | undefined;
   let minutes: number | undefined;
-  const colonTimeMatch = workingText.match(/(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)/);
+  const colonTimeMatch = workingText.match(/(?<!\d)([01]?\d|2[0-3]):([0-5]\\d)(?!\\d)/);
   const wordTimeMatch =
     !colonTimeMatch &&
-    workingText.match(/(?:(?<!\p{L})(?:о|об)\s+)([01]?\d|2[0-3])(?::([0-5]\d))?(?!\d)/iu);
+    workingText.match(/(?:(?<!\\p{L})(?:о|об)\\s+)([01]?\\d|2[0-3])(?::([0-5]\\d))?(?!\\d)/iu);
 
   if (colonTimeMatch) {
     hours = parseInt(colonTimeMatch[1], 10);
@@ -323,11 +323,11 @@ function tryParseQuickReminder(text: string) {
   }
 
   const fullDateMatch = workingText.match(
-    /(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](\d{4})(?!\d)/
+    /(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])[./](\d{4})(?!\\d)/
   );
   const shortDateMatch =
     !fullDateMatch &&
-    workingText.match(/(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])(?!\d)/);
+    workingText.match(/(?<!\d)(0?[1-9]|[12]\d|3[01])[./](0?[1-9]|1[0-2])(?!\\d)/);
 
   const isToday = /(?<!\p{L})сьогодні(?!\p{L})/iu.test(workingText);
   const isTomorrow = /(?<!\p{L})завтра(?!\p{L})/iu.test(workingText);
@@ -438,6 +438,14 @@ async function handleQuickReminder(chatId: string | number, parsed: any, botToke
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response('OK', { status: 200 });
+
+  if (!BOT_TOKEN) {
+    console.error('TELEGRAM_BOT_TOKEN is not configured in Supabase secrets');
+    return new Response(JSON.stringify({ error: 'TELEGRAM_BOT_TOKEN is not configured' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   try {
     const update = await req.json();

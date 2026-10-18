@@ -1,6 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '8785054597:AAEnDmyEKpNqHbT1hGyKMyc9Jkt5QCPoLUk';
+const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '';
 const CRON_SECRET = Deno.env.get('CRON_SECRET') || 'rem_cron_sec_9f5ccda14430a083';
 const SITE_URL = Deno.env.get('SITE_URL') || 'https://reminder-calendar-seven.vercel.app';
 
@@ -235,6 +235,14 @@ Deno.serve(async (req: Request) => {
   if (CRON_SECRET && secretHeader !== CRON_SECRET) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!BOT_TOKEN) {
+    console.error('TELEGRAM_BOT_TOKEN is not configured in Supabase secrets');
+    return new Response(JSON.stringify({ error: 'TELEGRAM_BOT_TOKEN is not configured' }), {
+      status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
