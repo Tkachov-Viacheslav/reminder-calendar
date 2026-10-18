@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useTeam } from '../context/TeamContext';
+import { Button } from './ui';
 
 export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
   const { user, isAuthenticated } = useTelegram();
@@ -157,13 +158,14 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
 
           {/* Quick add button (hidden if viewer) */}
           {canEdit && (
-            <button
+            <Button
               onClick={onOpenNewReminder}
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-sm shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-95"
+              variant="primary"
+              size="sm"
+              icon={<Plus className="w-4 h-4" />}
             >
-              <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Додати</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>

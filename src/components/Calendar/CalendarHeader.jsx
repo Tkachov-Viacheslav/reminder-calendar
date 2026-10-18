@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { MONTH_NAMES_UA } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
+import { Button } from '../ui';
 
 export function CalendarHeader({ viewDate, onPrevMonth, onNextMonth, onGoToday }) {
   const { triggerHaptic } = useTelegram();
@@ -36,13 +37,14 @@ export function CalendarHeader({ viewDate, onPrevMonth, onNextMonth, onGoToday }
       </div>
 
       <div className="flex items-center gap-1.5">
-        <button
+        <Button
+          variant="outline"
+          size="xs"
           onClick={handleToday}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors"
+          icon={<Calendar className="w-3.5 h-3.5 text-indigo-500" />}
         >
-          <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-          <span>Сьогодні</span>
-        </button>
+          Сьогодні
+        </Button>
 
         <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200 dark:border-slate-700">
           <button

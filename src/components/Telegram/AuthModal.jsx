@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, KeyRound, ExternalLink, LogOut, Bot, User, ShieldCheck } from 'lucide-react';
+import { KeyRound, ExternalLink, LogOut, Bot, User, ShieldCheck } from 'lucide-react';
 import { useTelegram } from '../../context/TelegramContext';
+import { Modal, Button } from '../ui';
 
 const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'reminderveter_bot';
 const CLIENT_ID = import.meta.env.VITE_TELEGRAM_CLIENT_ID || '8785054597';
@@ -85,29 +86,20 @@ export function AuthModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
-              {isAuthenticated ? <User className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5 text-sky-500" />}
-            </div>
-            <h3 className="font-bold text-base text-slate-900 dark:text-slate-100">
-              {isAuthenticated ? 'Мій профіль' : 'Вхід через Telegram'}
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
-            aria-label="Закрити"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-5 space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isAuthenticated ? 'Мій профіль' : 'Вхід через Telegram'}
+      icon={
+        isAuthenticated ? (
+          <User className="w-5 h-5" />
+        ) : (
+          <ShieldCheck className="w-5 h-5 text-sky-500" />
+        )
+      }
+      maxWidth="max-w-md"
+    >
+      <div className="p-5 space-y-4">
           {isAuthenticated ? (
             /* Logged in state */
             <div className="space-y-4">
@@ -135,13 +127,14 @@ export function AuthModal({ isOpen, onClose }) {
               </div>
 
               {!isInTelegram && (
-                <button
+                <Button
+                  variant="ghost"
                   onClick={logout}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl text-xs font-semibold transition-colors"
+                  icon={<LogOut className="w-3.5 h-3.5" />}
+                  className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Вийти з акаунта</span>
-                </button>
+                  Вийти з акаунта
+                </Button>
               )}
             </div>
           ) : (
@@ -161,17 +154,19 @@ export function AuthModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <button
-                  type="button"
+                <Button
                   onClick={handleTelegramOidc}
-                  disabled={tgLoading}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/25 transition-all hover:scale-[1.01] disabled:opacity-50"
+                  loading={tgLoading}
+                  size="md"
+                  className="w-full text-xs sm:text-sm font-bold"
+                  icon={
+                    <svg className="w-4 h-4 fill-white shrink-0" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .36z"/>
+                    </svg>
+                  }
                 >
-                  <svg className="w-4 h-4 fill-white shrink-0" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .36z"/>
-                  </svg>
-                  <span>{tgLoading ? 'З’єднуємося...' : 'Увійти через Telegram'}</span>
-                </button>
+                  {tgLoading ? 'З’єднуємося...' : 'Увійти через Telegram'}
+                </Button>
               </div>
 
               {error && (
@@ -230,20 +225,20 @@ export function AuthModal({ isOpen, onClose }) {
                       className="w-full px-3 py-2 text-center tracking-widest text-base font-mono font-bold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
 
-                    <button
+                    <Button
                       type="submit"
-                      disabled={codeLoading || code.length !== 6}
-                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                      loading={codeLoading}
+                      disabled={code.length !== 6}
+                      className="w-full"
                     >
                       {codeLoading ? 'Перевіряємо...' : 'Підтвердити код'}
-                    </button>
+                    </Button>
                   </form>
                 </div>
               )}
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

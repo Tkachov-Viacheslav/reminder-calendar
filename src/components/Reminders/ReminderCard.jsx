@@ -14,6 +14,7 @@ import {
 import { getCategoryMeta } from '../../utils/constants';
 import { formatTime } from '../../utils/dateUtils';
 import { useTelegram } from '../../context/TelegramContext';
+import { Badge } from '../ui';
 
 export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdate, canEdit = true }) {
   const { triggerHaptic } = useTelegram();
@@ -204,18 +205,15 @@ export function ReminderCard({ reminder, onToggleSent, onDelete, onEdit, onUpdat
           reminder.created_by_name) && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
             {reminder.created_by_name && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">
+              <Badge variant="slate" size="sm">
                 👤 {reminder.created_by_name}
-              </span>
+              </Badge>
             )}
             {Array.isArray(reminder.tagged_members) &&
               reminder.tagged_members.map((m, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border border-violet-200/50 dark:border-violet-800/40 font-medium"
-                >
+                <Badge key={idx} variant="violet" size="sm">
                   @{m.username || m.name}
-                </span>
+                </Badge>
               ))}
           </div>
         )}

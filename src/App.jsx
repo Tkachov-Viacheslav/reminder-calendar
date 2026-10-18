@@ -11,6 +11,7 @@ import { AuthModal } from './components/Telegram/AuthModal';
 import { TeamSettingsModal } from './components/Team/TeamSettingsModal';
 import { isSupabaseConfigured } from './services/supabase';
 import { Info, Users } from 'lucide-react';
+import { Card, Badge } from './components/ui';
 
 function CalendarContent() {
   const {
@@ -101,9 +102,9 @@ function CalendarContent() {
               </span>
             </div>
             {currentTeam.is_forum && (
-              <span className="text-[11px] font-semibold text-violet-600 dark:text-violet-400">
+              <Badge variant="violet" size="sm">
                 💬 Форум із темами
-              </span>
+              </Badge>
             )}
           </div>
         )}
@@ -111,7 +112,7 @@ function CalendarContent() {
         {/* Calendar and Reminders Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Calendar Box */}
-          <div className="lg:col-span-7 bg-white dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+          <Card className="lg:col-span-7">
             <CalendarHeader
               viewDate={viewDate}
               onPrevMonth={handlePrevMonth}
@@ -126,7 +127,7 @@ function CalendarContent() {
                 reminders={reminders}
               />
             </div>
-          </div>
+          </Card>
 
           {/* Reminders List Box */}
           <div className="lg:col-span-5 h-full">

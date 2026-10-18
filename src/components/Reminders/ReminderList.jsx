@@ -5,6 +5,7 @@ import { formatDateUkrainian, isSameDay } from '../../utils/dateUtils';
 import { SYSTEM_CATEGORIES } from '../../utils/constants';
 import { useReminders } from '../../context/ReminderContext';
 import { useTeam } from '../../context/TeamContext';
+import { Card } from '../ui';
 
 export function ReminderList({ onOpenNewReminder, onEditReminder }) {
   const { reminders, customCategories, selectedDate, updateReminder, deleteReminder } =
@@ -43,7 +44,7 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
   const isFilterActive = searchQuery.trim() !== '' || selectedCategory !== 'all';
 
   return (
-    <div className="bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 flex flex-col h-full">
+    <Card variant="muted" className="flex flex-col h-full">
       {/* List Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>
@@ -173,6 +174,6 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
           ))
         )}
       </div>
-    </div>
+    </Card>
   );
 }
