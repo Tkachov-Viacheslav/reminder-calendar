@@ -5,6 +5,9 @@ import { Button, Input, Select } from '../../ui';
 export function TeamGeneralTab({ currentTeam, updateTeamSettings }) {
   const [teamTitle, setTeamTitle] = useState(currentTeam?.title || '');
   const [defaultRole, setDefaultRole] = useState(currentTeam?.default_role || 'editor');
+  const [autoDeleteSeconds, setAutoDeleteSeconds] = useState(
+    currentTeam?.auto_delete_seconds !== undefined ? currentTeam.auto_delete_seconds : 120
+  );
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const handleSaveGeneral = async (e) => {
@@ -12,6 +15,7 @@ export function TeamGeneralTab({ currentTeam, updateTeamSettings }) {
     await updateTeamSettings({
       title: teamTitle.trim() || currentTeam.title,
       default_role: defaultRole,
+      auto_delete_seconds: Number(autoDeleteSeconds),
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
@@ -32,6 +36,18 @@ export function TeamGeneralTab({ currentTeam, updateTeamSettings }) {
       >
         <option value="editor">Редактор (може створювати нагадування)</option>
         <option value="viewer">Переглядач (лише перегляд)</option>
+      </Select>
+
+      <Select
+        label="Автовидалення команд бота у чаті (окрім самих нагадувань)"
+        value={autoDeleteSeconds}
+        onChange={(e) => setAutoDeleteSeconds(Number(e.target.value))}
+      >
+        <option value={60}>Через 1 хвилину</option>
+        <option value={120}>Через 2 хвилини (рекомендовано)</option>
+        <option value={300}>Через 5 хвилин</option>
+        <option value={900}>Через 15 хвилин</option>
+        <option value={0}>Вимкнено (залишати всі команди в чаті)</option>
       </Select>
 
       <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">

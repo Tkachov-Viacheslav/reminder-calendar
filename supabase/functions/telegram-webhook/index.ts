@@ -16,6 +16,7 @@ import {
   handleBindCommand,
   handleTopicCommand,
   handleTeamCommand,
+  handleAddMemberCommand,
   handleMyChatMemberUpdate,
 } from './commands.ts';
 
@@ -140,7 +141,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (lowerText.startsWith('/bind')) {
-        await handleBindCommand(chatId, threadId, text, message.from, BOT_TOKEN);
+        await handleBindCommand(chatId, threadId, text, message.from, BOT_TOKEN, message.message_id);
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -148,7 +149,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (lowerText.startsWith('/topic')) {
-        await handleTopicCommand(chatId, threadId, text, message.from, BOT_TOKEN);
+        await handleTopicCommand(chatId, threadId, text, message.from, BOT_TOKEN, message.message_id);
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -156,7 +157,15 @@ Deno.serve(async (req: Request) => {
       }
 
       if (lowerText.startsWith('/sync')) {
-        await handleSyncCommand(chatId, threadId, message.chat, BOT_TOKEN, SITE_URL);
+        await handleSyncCommand(chatId, threadId, message.chat, BOT_TOKEN, SITE_URL, message.message_id);
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (lowerText.startsWith('/addmember') || lowerText.startsWith('/додати')) {
+        await handleAddMemberCommand(chatId, threadId, text, message.from, BOT_TOKEN, message.message_id);
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -168,7 +177,7 @@ Deno.serve(async (req: Request) => {
         lowerText.startsWith('/calendar') ||
         lowerText.startsWith('/календар')
       ) {
-        await handleTeamCommand(chatId, threadId, BOT_TOKEN, SITE_URL);
+        await handleTeamCommand(chatId, threadId, BOT_TOKEN, SITE_URL, message.message_id);
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -186,7 +195,7 @@ Deno.serve(async (req: Request) => {
         const keyboard = [
           [{ text: '💬 Переглянути всі мої групи', url: `https://t.me/reminderveter_bot?start=groups` }],
         ];
-        await sendGroupMessage(BOT_TOKEN, chatId, reply, threadId, keyboard);
+        await sendGroupMessage(BOT_TOKEN, chatId, reply, threadId, keyboard, message.message_id);
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

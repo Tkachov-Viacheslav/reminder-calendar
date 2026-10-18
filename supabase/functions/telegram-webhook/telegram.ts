@@ -1,3 +1,5 @@
+import { getSupabaseClient } from './db.ts';
+
 export async function sendBotMessage(
   botToken: string,
   chatId: string | number,
@@ -26,8 +28,9 @@ export async function sendGroupMessage(
   chatId: string | number,
   text: string,
   threadId?: number | null,
-  extraRows: any[] = []
-) {
+  extraRows: any[] = [],
+  incomingMessageId?: number | null
+): Promise<any> {
   const body: any = {
     chat_id: chatId,
     text,
@@ -39,11 +42,44 @@ export async function sendGroupMessage(
   if (extraRows.length > 0) {
     body.reply_markup = { inline_keyboard: extraRows };
   }
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+  const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  const data = await res.json();
+
+  if (data?.ok && data.result?.message_id) {
+    try {
+      const supabase = getSupabaseClient();
+      const teamId = `team_${chatId}`;
+      const { data: team } = await supabase
+        .from('teams')
+        .select('auto_delete_seconds')
+        .eq('id', teamId)
+        .maybeSingle();
+
+      const delay = team?.auto_delete_seconds ?? 120;
+      if (delay > 0) {
+        const deleteAt = new Date(Date.now() + delay * 1000).toISOString();
+        const inserts: any[] = [
+          { chat_id: String(chatId), message_id: Number(data.result.message_id), delete_at: deleteAt },
+        ];
+        if (incomingMessageId) {
+          inserts.push({
+            chat_id: String(chatId),
+            message_id: Number(incomingMessageId),
+            delete_at: deleteAt,
+          });
+        }
+        await supabase.from('bot_ephemeral_messages').insert(inserts);
+      }
+    } catch (err) {
+      console.warn('Failed to schedule ephemeral message deletion:', err);
+    }
+  }
+
+  return data;
 }
 
 export async function answerCallbackQuery(botToken: string, queryId: string, text?: string) {

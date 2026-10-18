@@ -35,6 +35,39 @@ async function processScheduledReminder(
   return ok;
 }
 
+async function cleanupEphemeralMessages(supabase: any, botToken: string) {
+  try {
+    const now = new Date().toISOString();
+    const { data: messages } = await supabase
+      .from('bot_ephemeral_messages')
+      .select('id, chat_id, message_id')
+      .lte('delete_at', now)
+      .limit(60);
+
+    if (!messages || messages.length === 0) return;
+
+    for (const msg of messages) {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/deleteMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: msg.chat_id,
+            message_id: Number(msg.message_id),
+          }),
+        });
+      } catch (err) {
+        console.warn(`Failed to delete message ${msg.message_id}:`, err);
+      }
+    }
+
+    const ids = messages.map((m: any) => m.id);
+    await supabase.from('bot_ephemeral_messages').delete().in('id', ids);
+  } catch (err) {
+    console.error('Failed to cleanup ephemeral messages:', err);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const secretHeader = req.headers.get('x-cron-secret');
   if (CRON_SECRET && secretHeader !== CRON_SECRET) {
@@ -58,7 +91,10 @@ Deno.serve(async (req: Request) => {
   // 1. Morning Digest for users
   await handleMorningDigests(supabase, BOT_TOKEN, SITE_URL);
 
-  // 2. Scheduled Reminders
+  // 2. Cleanup ephemeral service messages in group chats
+  await cleanupEphemeralMessages(supabase, BOT_TOKEN);
+
+  // 3. Scheduled Reminders
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')

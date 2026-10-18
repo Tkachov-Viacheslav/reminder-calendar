@@ -94,6 +94,18 @@ export function TeamProvider({ children }) {
             setUserRole(existingMember.role);
           }
         }
+      } else {
+        // Команда більше не існує (її видалили з чату)
+        setCurrentTeam(null);
+        setActiveTeamId(null);
+        try {
+          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
+        } catch {}
+        setUserRole('owner');
+        setTeamMembers([]);
+        setTeamTopics([]);
+        setCategoryTopics({});
+        return;
       }
 
       // 2. Fetch team members
@@ -150,6 +162,52 @@ export function TeamProvider({ children }) {
     };
   }, [fetchUserTeams, fetchCurrentTeamData]);
 
+  // Realtime subscription for teams and team_members
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    const channel = supabase
+      .channel('public:teams_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'teams' },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old?.id;
+            setUserTeams((prev) => prev.filter((t) => t.id !== deletedId));
+            if (activeTeamId === deletedId) {
+              setActiveTeamId(null);
+              setCurrentTeam(null);
+              try {
+                localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
+              } catch {}
+              showToast('Команду видалено або бот покинув чат', 'info');
+            }
+          } else {
+            fetchUserTeams();
+            if (activeTeamId && payload.new?.id === activeTeamId) {
+              fetchCurrentTeamData();
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'team_members' },
+        () => {
+          fetchUserTeams();
+          if (activeTeamId) {
+            fetchCurrentTeamData();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTeamId, fetchUserTeams, fetchCurrentTeamData, showToast]);
+
   const switchWorkspace = useCallback(
     (teamId) => {
       triggerHaptic('light');
@@ -198,6 +256,68 @@ export function TeamProvider({ children }) {
       } catch (err) {
         console.error('Failed to update member role:', err);
         showToast('Помилка оновлення ролі', 'error');
+      }
+    },
+    [activeTeamId, triggerHaptic, showToast]
+  );
+
+  const addTeamMember = useCallback(
+    async (rawIdentifier, role = 'editor') => {
+      if (!activeTeamId || !supabase) return;
+      triggerHaptic('light');
+      const clean = rawIdentifier.trim().replace(/^@/, '');
+      if (!clean) return;
+      const placeholderId = `@${clean.toLowerCase()}`;
+
+      const exists = teamMembers.some(
+        (m) =>
+          m.telegram_id === placeholderId ||
+          (m.username && m.username.toLowerCase() === clean.toLowerCase())
+      );
+      if (exists) {
+        showToast('Учасник вже є у списку', 'warning');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('team_members')
+          .insert({
+            team_id: activeTeamId,
+            telegram_id: placeholderId,
+            username: clean,
+            first_name: `@${clean}`,
+            role,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        setTeamMembers((prev) => [...prev, data]);
+        showToast(`Учасника @${clean} успішно додано`, 'success');
+      } catch (err) {
+        console.error('Failed to add team member:', err);
+        showToast('Помилка додавання учасника', 'error');
+      }
+    },
+    [activeTeamId, teamMembers, triggerHaptic, showToast]
+  );
+
+  const removeTeamMember = useCallback(
+    async (memberId) => {
+      if (!activeTeamId || !supabase) return;
+      triggerHaptic('light');
+      try {
+        const { error } = await supabase
+          .from('team_members')
+          .delete()
+          .eq('team_id', activeTeamId)
+          .eq('id', memberId);
+        if (error) throw error;
+        setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+        showToast('Учасника видалено зі списку', 'info');
+      } catch (err) {
+        console.error('Failed to remove team member:', err);
+        showToast('Помилка видалення учасника', 'error');
       }
     },
     [activeTeamId, triggerHaptic, showToast]
@@ -309,6 +429,8 @@ export function TeamProvider({ children }) {
         switchWorkspace,
         updateTeamSettings,
         updateMemberRole,
+        addTeamMember,
+        removeTeamMember,
         setCategoryTopicMapping,
         addTeamTopic,
         deleteTeamTopic,

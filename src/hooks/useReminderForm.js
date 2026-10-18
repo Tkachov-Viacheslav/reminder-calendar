@@ -4,7 +4,14 @@ import { toISODateString } from '../utils/dateUtils';
 import { useTelegram } from '../context/TelegramContext';
 import { useReminders } from '../context/ReminderContext';
 
-export function useReminderForm({ isOpen, editingReminder, initialDate, onSave, onClose }) {
+export function useReminderForm({
+  isOpen,
+  editingReminder,
+  initialDate,
+  categoryTopics = {},
+  onSave,
+  onClose,
+}) {
   const { triggerHaptic } = useTelegram();
   const { addCustomCategory, deleteCustomCategory } = useReminders();
 
@@ -47,17 +54,51 @@ export function useReminderForm({ isOpen, editingReminder, initialDate, onSave, 
     } else {
       setTitle('');
       setDescription('');
-      setCategory(DEFAULT_CATEGORY);
+      const initialCat = DEFAULT_CATEGORY;
+      setCategory(initialCat);
       setRepeatType('none');
       setRemindBefore(0);
       setItems([]);
-      setThreadId(null);
+      const mappedThread = categoryTopics?.[initialCat.toLowerCase()];
+      setThreadId(mappedThread && Number(mappedThread) > 0 ? Number(mappedThread) : null);
       setTaggedMembers([]);
       setDateStr(toISODateString(initialDate || new Date()));
       setTimeStr(getDefaultTime());
     }
     setError('');
-  }, [isOpen, editingReminder, initialDate]);
+  }, [isOpen, editingReminder, initialDate, categoryTopics]);
+
+  const handleSelectCategory = useCallback(
+    (catId) => {
+      triggerHaptic('light');
+      setCategory(catId);
+      if (categoryTopics) {
+        const cleanCat = String(catId).toLowerCase().trim();
+        const mapped = categoryTopics[cleanCat];
+        if (mapped !== undefined) {
+          setThreadId(Number(mapped) > 0 ? Number(mapped) : null);
+        }
+      }
+    },
+    [categoryTopics, triggerHaptic]
+  );
+
+  const handleSelectThreadId = useCallback(
+    (newThreadId) => {
+      triggerHaptic('light');
+      const tid = Number(newThreadId) || null;
+      setThreadId(tid);
+      if (categoryTopics && tid) {
+        const matched = Object.entries(categoryTopics).find(
+          ([_, mappedTid]) => Number(mappedTid) === tid
+        );
+        if (matched && matched[0]) {
+          setCategory(matched[0]);
+        }
+      }
+    },
+    [categoryTopics, triggerHaptic]
+  );
 
   const handleToggleMemberTag = useCallback((member) => {
     const memberId = String(member.telegram_id);
@@ -197,6 +238,8 @@ export function useReminderForm({ isOpen, editingReminder, initialDate, onSave, 
     handleDeleteItem,
     handleAddCategory,
     handleDeleteCategory,
+    handleSelectCategory,
+    handleSelectThreadId,
     handleSubmit,
   };
 }

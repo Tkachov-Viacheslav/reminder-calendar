@@ -11,9 +11,16 @@ export function CategoryChips({
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState(null);
   const safeCustom = Array.isArray(customCategories)
     ? customCategories.filter((c) => Boolean(c && String(c).trim()))
     : [];
+
+  React.useEffect(() => {
+    if (!confirmDeleteCat) return;
+    const timer = setTimeout(() => setConfirmDeleteCat(null), 4000);
+    return () => clearTimeout(timer);
+  }, [confirmDeleteCat]);
 
   const handleAddSubmit = (e) => {
     if (e) e.preventDefault();
@@ -57,10 +64,47 @@ export function CategoryChips({
           );
         })}
 
-        {/* Custom Categories */}
+        {/* Custom Categories with Accidental Delete Protection */}
         {safeCustom.map((catName) => {
           const meta = getCategoryMeta(catName);
           const isSelected = category === catName;
+          const isConfirming = confirmDeleteCat === catName;
+
+          if (isConfirming) {
+            return (
+              <div
+                key={catName}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 animate-fadeIn"
+              >
+                <span>Видалити «{catName}»?</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteCustomCategory(catName);
+                    setConfirmDeleteCat(null);
+                  }}
+                  className="p-0.5 hover:bg-rose-200 dark:hover:bg-rose-900 rounded text-rose-800 dark:text-rose-200 transition-colors"
+                  title="Підтвердити видалення"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteCat(null);
+                  }}
+                  className="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 transition-colors"
+                  title="Скасувати"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          }
+
           return (
             <div
               key={catName}
@@ -78,7 +122,7 @@ export function CategoryChips({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDeleteCustomCategory(catName);
+                  setConfirmDeleteCat(catName);
                 }}
                 className="text-slate-400 hover:text-rose-500 p-0.5 rounded transition-colors"
                 title="Видалити категорію"

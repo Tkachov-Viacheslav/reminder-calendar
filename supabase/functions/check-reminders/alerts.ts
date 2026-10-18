@@ -166,11 +166,21 @@ export async function sendTeamReminderAlert(
     groupPayload.message_thread_id = Number(targetThreadId);
   }
 
-  const groupRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+  let groupRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(groupPayload),
   });
+
+  // Захисний fallback: якщо тема форуму видалена або недоступна
+  if (!groupRes.ok && groupPayload.message_thread_id) {
+    delete groupPayload.message_thread_id;
+    groupRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(groupPayload),
+    });
+  }
 
   const pmRecipients = new Set<string>();
   if (reminder.user_id && reminder.user_id !== 'guest') {

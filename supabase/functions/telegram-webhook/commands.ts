@@ -286,7 +286,8 @@ export async function handleSyncCommand(
   threadId: number | undefined,
   chat: any,
   botToken: string,
-  siteUrl: string
+  siteUrl: string,
+  incomingMessageId?: number | null
 ) {
   const supabase = getSupabaseClient();
   const teamId = `team_${chatId}`;
@@ -323,7 +324,7 @@ export async function handleSyncCommand(
   const keyboard = [
     [{ text: '📅 Відкрити командний календар', url: `${siteUrl}/?team=${teamId}` }],
   ];
-  await sendGroupMessage(botToken, chatId, reply, threadId, keyboard);
+  await sendGroupMessage(botToken, chatId, reply, threadId, keyboard, incomingMessageId);
 }
 
 export async function handleBindCommand(
@@ -331,7 +332,8 @@ export async function handleBindCommand(
   threadId: number | undefined,
   text: string,
   user: any,
-  botToken: string
+  botToken: string,
+  incomingMessageId?: number | null
 ) {
   const parts = text.split(/\s+/);
   const categoryRaw = parts[1]?.trim();
@@ -344,7 +346,7 @@ export async function handleBindCommand(
       `Введіть <code>/bind назва_категорії</code> у потрібній гілці чату.\n\n` +
       `Наприклад: <code>/bind робота</code> або <code>/bind навчання</code>.\n` +
       `Після цього всі нагадування з цією категорією надсилатимуться сюди!`;
-    await sendGroupMessage(botToken, chatId, helpMsg, threadId);
+    await sendGroupMessage(botToken, chatId, helpMsg, threadId, [], incomingMessageId);
     return;
   }
 
@@ -376,7 +378,7 @@ export async function handleBindCommand(
   const reply =
     `📌 Категорію <b>#${cleanCategory}</b> успішно прив'язано до ${targetTopicText}!\n\n` +
     `Тепер усі командні нагадування цієї категорії надсилатимуться сюди.`;
-  await sendGroupMessage(botToken, chatId, reply, threadId);
+  await sendGroupMessage(botToken, chatId, reply, threadId, [], incomingMessageId);
 }
 
 export async function handleTopicCommand(
@@ -384,14 +386,17 @@ export async function handleTopicCommand(
   threadId: number | undefined,
   text: string,
   user: any,
-  botToken: string
+  botToken: string,
+  incomingMessageId?: number | null
 ) {
   if (!threadId) {
     await sendGroupMessage(
       botToken,
       chatId,
       '⚠️ Цю команду потрібно викликати всередині конкретної теми форуму!',
-      threadId
+      threadId,
+      [],
+      incomingMessageId
     );
     return;
   }
@@ -406,7 +411,9 @@ export async function handleTopicCommand(
       botToken,
       chatId,
       '💡 Вкажіть назву для цієї теми:\n<code>/topic Назва теми</code>',
-      threadId
+      threadId,
+      [],
+      incomingMessageId
     );
     return;
   }
@@ -416,7 +423,9 @@ export async function handleTopicCommand(
     botToken,
     chatId,
     `🏷️ Тему <b>#${threadId}</b> зареєстровано як <b>«${escapeHtml(topicName)}»</b>!\nВона вже доступна для вибору в календарі.`,
-    threadId
+    threadId,
+    [],
+    incomingMessageId
   );
 }
 
@@ -424,7 +433,8 @@ export async function handleTeamCommand(
   chatId: string | number,
   threadId: number | undefined,
   botToken: string,
-  siteUrl: string
+  siteUrl: string,
+  incomingMessageId?: number | null
 ) {
   const teamId = `team_${chatId}`;
   const botStatus = await getBotChatStatus(botToken, chatId);
@@ -439,7 +449,70 @@ export async function handleTeamCommand(
   const keyboard = [
     [{ text: '📅 Відкрити командний календар', url: `${siteUrl}/?team=${teamId}` }],
   ];
-  await sendGroupMessage(botToken, chatId, reply, threadId, keyboard);
+  await sendGroupMessage(botToken, chatId, reply, threadId, keyboard, incomingMessageId);
+}
+
+export async function handleAddMemberCommand(
+  chatId: string | number,
+  threadId: number | undefined,
+  text: string,
+  user: any,
+  botToken: string,
+  incomingMessageId?: number | null
+) {
+  const parts = text.split(/\s+/);
+  parts.shift();
+  const rawUsername = parts[0]?.trim();
+  const teamId = `team_${chatId}`;
+  const supabase = getSupabaseClient();
+
+  if (!rawUsername) {
+    const helpMsg =
+      `💡 <b>Додавання учасника чату до календаря:</b>\n\n` +
+      `Введіть <code>/addmember @username</code> у чаті.\n\n` +
+      `Після цього користувача можна буде обирати відповідальним у календарі, а бот тегатиме його в сповіщеннях!`;
+    await sendGroupMessage(botToken, chatId, helpMsg, threadId, [], incomingMessageId);
+    return;
+  }
+
+  const clean = rawUsername.replace(/^@/, '');
+  const placeholderId = `@${clean.toLowerCase()}`;
+
+  const { data: existing } = await supabase
+    .from('team_members')
+    .select('id, username')
+    .eq('team_id', teamId)
+    .or(`telegram_id.eq.${placeholderId},username.ilike.${clean}`)
+    .maybeSingle();
+
+  if (existing) {
+    await sendGroupMessage(
+      botToken,
+      chatId,
+      `ℹ️ Учасник <b>@${escapeHtml(clean)}</b> вже є у списку команди.`,
+      threadId,
+      [],
+      incomingMessageId
+    );
+    return;
+  }
+
+  await supabase.from('team_members').insert({
+    team_id: teamId,
+    telegram_id: placeholderId,
+    username: clean,
+    first_name: `@${clean}`,
+    role: 'editor',
+  });
+
+  await sendGroupMessage(
+    botToken,
+    chatId,
+    `✅ Учасника <b>@${escapeHtml(clean)}</b> додано до команди!\nТепер його можна призначати відповідальним у розкладі, а бот тегатиме його під час нагадувань.`,
+    threadId,
+    [],
+    incomingMessageId
+  );
 }
 
 export async function handleMyChatMemberUpdate(mcm: any, botToken: string, siteUrl: string) {

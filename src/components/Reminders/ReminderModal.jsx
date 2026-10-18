@@ -17,7 +17,7 @@ export function ReminderModal({
   editingReminder,
 }) {
   const { triggerHaptic, setClosingConfirmation } = useTelegram();
-  const { currentTeam, teamMembers, teamTopics } = useTeam();
+  const { currentTeam, teamMembers, teamTopics, categoryTopics } = useTeam();
   const { customCategories } = useReminders();
 
   React.useEffect(() => {
@@ -31,6 +31,7 @@ export function ReminderModal({
     isOpen,
     editingReminder,
     initialDate,
+    categoryTopics,
     onSave,
     onClose,
   });
@@ -118,10 +119,7 @@ export function ReminderModal({
         {/* Categories */}
         <CategoryChips
           category={form.category}
-          onSelectCategory={(catId) => {
-            triggerHaptic('light');
-            form.setCategory(catId);
-          }}
+          onSelectCategory={form.handleSelectCategory}
           customCategories={customCategories}
           onAddCustomCategory={form.handleAddCategory}
           onDeleteCustomCategory={form.handleDeleteCategory}
@@ -141,7 +139,7 @@ export function ReminderModal({
           teamTopics={teamTopics}
           teamMembers={teamMembers}
           threadId={form.threadId}
-          setThreadId={form.setThreadId}
+          setThreadId={form.handleSelectThreadId}
           taggedMembers={form.taggedMembers}
           onToggleMemberTag={form.handleToggleMemberTag}
           onRemoveTagged={form.handleRemoveTagged}

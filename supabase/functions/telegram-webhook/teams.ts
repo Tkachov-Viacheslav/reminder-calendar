@@ -31,12 +31,28 @@ export async function ensureTeamExists(supabase: any, chat: any, createdBy?: str
 export async function recordTeamMember(supabase: any, teamId: string, user: any, forceAdmin = false) {
   if (!user || !user.id) return;
   const userId = String(user.id);
-  const { data: existing } = await supabase
+  const cleanUsername = (user.username || '').replace(/^@/, '').toLowerCase();
+
+  let { data: existing } = await supabase
     .from('team_members')
-    .select('id, role')
+    .select('id, role, telegram_id')
     .eq('team_id', teamId)
     .eq('telegram_id', userId)
     .maybeSingle();
+
+  // Якщо користувача ще не було за ID, перевіряємо чи адмін додав його за @username
+  if (!existing && cleanUsername) {
+    const { data: placeholder } = await supabase
+      .from('team_members')
+      .select('id, role, telegram_id')
+      .eq('team_id', teamId)
+      .ilike('username', cleanUsername)
+      .maybeSingle();
+
+    if (placeholder && String(placeholder.telegram_id).startsWith('@')) {
+      existing = placeholder;
+    }
+  }
 
   if (!existing) {
     await supabase.from('team_members').insert({
@@ -48,6 +64,7 @@ export async function recordTeamMember(supabase: any, teamId: string, user: any,
     });
   } else {
     const updates: any = {
+      telegram_id: userId,
       first_name: user.first_name || '',
       username: user.username || '',
       updated_at: new Date().toISOString(),
@@ -58,8 +75,7 @@ export async function recordTeamMember(supabase: any, teamId: string, user: any,
     await supabase
       .from('team_members')
       .update(updates)
-      .eq('team_id', teamId)
-      .eq('telegram_id', userId);
+      .eq('id', existing.id);
   }
 }
 

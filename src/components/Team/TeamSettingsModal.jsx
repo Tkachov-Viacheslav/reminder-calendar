@@ -16,8 +16,11 @@ export function TeamSettingsModal({ isOpen, onClose }) {
     teamMembers,
     teamTopics,
     categoryTopics,
+    isTeamAdmin,
     updateTeamSettings,
     updateMemberRole,
+    addTeamMember,
+    removeTeamMember,
     setCategoryTopicMapping,
     addTeamTopic,
     deleteTeamTopic,
@@ -104,6 +107,9 @@ export function TeamSettingsModal({ isOpen, onClose }) {
             <TeamMembersTab
               teamMembers={teamMembers}
               updateMemberRole={updateMemberRole}
+              addTeamMember={addTeamMember}
+              removeTeamMember={removeTeamMember}
+              isTeamAdmin={isTeamAdmin}
             />
           )}
 
