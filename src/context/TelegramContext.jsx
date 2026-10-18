@@ -29,10 +29,25 @@ export function TelegramProvider({ children }) {
     }
   };
 
+  const loginWithTelegram = useCallback((tgUser) => {
+    if (!tgUser || !tgUser.id) return { success: false, error: 'Дані користувача відсутні' };
+    const formattedUser = {
+      id: String(tgUser.id),
+      first_name: tgUser.first_name || '',
+      username: tgUser.username || '',
+      photo_url: tgUser.photo_url || '',
+    };
+    setUser(formattedUser);
+    localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(formattedUser));
+    triggerHaptic('success');
+    return { success: true, user: formattedUser };
+  }, []);
+
   const loginWithCode = useCallback(async (code) => {
     triggerHaptic('light');
     try {
-      const res = await fetch('/api/verify-code', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dwzswscabsphwprptnos.supabase.co';
+      const res = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: String(code).trim() }),
@@ -94,6 +109,7 @@ export function TelegramProvider({ children }) {
         isAuthenticated: Boolean(activeUserId),
         activeUserId,
         loginWithCode,
+        loginWithTelegram,
         logout,
         triggerHaptic,
       }}
