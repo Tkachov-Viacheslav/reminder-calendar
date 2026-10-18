@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useTelegram } from './TelegramContext';
+import { useToast } from './ToastContext';
 import { LOCAL_STORAGE_ACTIVE_TEAM } from '../utils/constants';
 
 const TeamContext = createContext(null);
 
 export function TeamProvider({ children }) {
   const { user, activeUserId, triggerHaptic } = useTelegram();
+  const { showToast } = useToast();
   const [userTeams, setUserTeams] = useState([]);
   const [activeTeamId, setActiveTeamId] = useState(() => {
     try {
@@ -169,11 +171,13 @@ export function TeamProvider({ children }) {
         const { error } = await supabase.from('teams').update(updates).eq('id', activeTeamId);
         if (error) throw error;
         setCurrentTeam((prev) => (prev ? { ...prev, ...updates } : prev));
+        showToast('Налаштування команди збережено', 'success');
       } catch (err) {
         console.error('Failed to update team settings:', err);
+        showToast('Помилка оновлення налаштувань', 'error');
       }
     },
-    [activeTeamId, triggerHaptic]
+    [activeTeamId, triggerHaptic, showToast]
   );
 
   const updateMemberRole = useCallback(
@@ -190,11 +194,13 @@ export function TeamProvider({ children }) {
         setTeamMembers((prev) =>
           prev.map((m) => (m.telegram_id === String(telegramId) ? { ...m, role: newRole } : m))
         );
+        showToast('Роль учасника змінено', 'success');
       } catch (err) {
         console.error('Failed to update member role:', err);
+        showToast('Помилка оновлення ролі', 'error');
       }
     },
-    [activeTeamId, triggerHaptic]
+    [activeTeamId, triggerHaptic, showToast]
   );
 
   const setCategoryTopicMapping = useCallback(
@@ -226,11 +232,13 @@ export function TeamProvider({ children }) {
           );
           setCategoryTopics((prev) => ({ ...prev, [cleanCat]: Number(threadId) }));
         }
+        showToast('Прив’язку теми збережено', 'success');
       } catch (err) {
         console.error('Failed to set category topic mapping:', err);
+        showToast('Помилка збереження теми', 'error');
       }
     },
-    [activeTeamId, triggerHaptic]
+    [activeTeamId, triggerHaptic, showToast]
   );
 
   const addTeamTopic = useCallback(
@@ -256,11 +264,13 @@ export function TeamProvider({ children }) {
           const filtered = prev.filter((t) => t.thread_id !== Number(threadId));
           return [...filtered, data].sort((a, b) => a.name.localeCompare(b.name));
         });
+        showToast('Тему додано', 'success');
       } catch (err) {
         console.error('Failed to add team topic:', err);
+        showToast('Помилка додавання теми', 'error');
       }
     },
-    [activeTeamId, triggerHaptic]
+    [activeTeamId, triggerHaptic, showToast]
   );
 
   const deleteTeamTopic = useCallback(
@@ -271,11 +281,13 @@ export function TeamProvider({ children }) {
         const { error } = await supabase.from('team_topics').delete().eq('id', topicId);
         if (error) throw error;
         setTeamTopics((prev) => prev.filter((t) => t.id !== topicId));
+        showToast('Тему видалено', 'info');
       } catch (err) {
         console.error('Failed to delete team topic:', err);
+        showToast('Помилка видалення теми', 'error');
       }
     },
-    [activeTeamId, triggerHaptic]
+    [activeTeamId, triggerHaptic, showToast]
   );
 
   const isTeamAdmin = userRole === 'admin';

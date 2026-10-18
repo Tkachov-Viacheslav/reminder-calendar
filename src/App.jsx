@@ -13,6 +13,7 @@ import { isSupabaseConfigured } from './services/supabase';
 import { Info, Users } from 'lucide-react';
 import { Card, Badge } from './components/ui';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ToastProvider } from './context/ToastContext';
 
 function CalendarContent() {
   const {
@@ -163,13 +164,15 @@ function CalendarContent() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <TelegramProvider>
-        <TeamProvider>
-          <ReminderProvider>
-            <CalendarContent />
-          </ReminderProvider>
-        </TeamProvider>
-      </TelegramProvider>
+      <ToastProvider>
+        <TelegramProvider>
+          <TeamProvider>
+            <ReminderProvider>
+              <CalendarContent />
+            </ReminderProvider>
+          </TeamProvider>
+        </TelegramProvider>
+      </ToastProvider>
     </ErrorBoundary>
   );
 }

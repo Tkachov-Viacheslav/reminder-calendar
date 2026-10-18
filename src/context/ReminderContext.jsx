@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 import { useTelegram } from './TelegramContext';
 import { useTeam } from './TeamContext';
+import { useToast } from './ToastContext';
 import { LOCAL_STORAGE_KEY, LOCAL_STORAGE_CUSTOM_CATEGORIES } from '../utils/constants';
 
 const ReminderContext = createContext(null);
@@ -9,6 +10,7 @@ const ReminderContext = createContext(null);
 export function ReminderProvider({ children }) {
   const { user, activeUserId, triggerHaptic } = useTelegram();
   const { activeTeamId } = useTeam();
+  const { showToast } = useToast();
   const [reminders, setReminders] = useState([]);
   const [customCategories, setCustomCategories] = useState(() => {
     try {
@@ -130,6 +132,48 @@ export function ReminderProvider({ children }) {
     };
   }, [fetchReminders]);
 
+  // Realtime subscription for instant sync from Telegram bot and team members
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    const channelName = `realtime-reminders-${activeTeamId || activeUserId || 'guest'}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reminders' },
+        (payload) => {
+          const { eventType, new: newRec, old: oldRec } = payload;
+          const isCurrentScope = activeTeamId
+            ? newRec?.team_id === activeTeamId || oldRec?.team_id === activeTeamId
+            : (!newRec?.team_id && (!activeUserId || newRec?.user_id === activeUserId)) ||
+              (!oldRec?.team_id && (!activeUserId || oldRec?.user_id === activeUserId));
+
+          if (!isCurrentScope) return;
+
+          if (eventType === 'INSERT' && newRec) {
+            setReminders((prev) => {
+              if (prev.some((r) => r.id === newRec.id)) return prev;
+              return [...prev, newRec].sort(
+                (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
+              );
+            });
+          } else if (eventType === 'UPDATE' && newRec) {
+            setReminders((prev) =>
+              prev.map((r) => (r.id === newRec.id ? { ...r, ...newRec } : r))
+            );
+          } else if (eventType === 'DELETE' && oldRec) {
+            setReminders((prev) => prev.filter((r) => r.id !== oldRec.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTeamId, activeUserId]);
+
   const addReminder = useCallback(
     async (item) => {
       triggerHaptic('light');
@@ -149,10 +193,12 @@ export function ReminderProvider({ children }) {
           if (error) throw error;
           if (data?.[0]) {
             setReminders((prev) => [...prev, data[0]]);
+            showToast('Нагадування створено', 'success');
             return data[0];
           }
         } catch (e) {
           console.error('Error saving to Supabase, saving locally', e);
+          showToast('Збережено в локальному сховищі', 'info');
         }
       }
 
@@ -161,9 +207,10 @@ export function ReminderProvider({ children }) {
         localStorage.setItem(storageKey, JSON.stringify(updated));
         return updated;
       });
+      showToast('Нагадування створено', 'success');
       return newReminder;
     },
-    [activeUserId, activeTeamId, user, storageKey, triggerHaptic]
+    [activeUserId, activeTeamId, user, storageKey, triggerHaptic, showToast]
   );
 
   const updateReminder = useCallback(
@@ -183,8 +230,16 @@ export function ReminderProvider({ children }) {
         localStorage.setItem(storageKey, JSON.stringify(updated));
         return updated;
       });
+
+      if (updates.is_sent !== undefined) {
+        showToast(updates.is_sent ? 'Позначено як виконане' : 'Повернуто в активні', 'success');
+      } else if (updates.remind_at) {
+        showToast('Час нагадування оновлено', 'info');
+      } else {
+        showToast('Зміни збережено', 'success');
+      }
     },
-    [storageKey, triggerHaptic]
+    [storageKey, triggerHaptic, showToast]
   );
 
   const deleteReminder = useCallback(
@@ -204,8 +259,9 @@ export function ReminderProvider({ children }) {
         localStorage.setItem(storageKey, JSON.stringify(updated));
         return updated;
       });
+      showToast('Нагадування видалено', 'info');
     },
-    [storageKey, triggerHaptic]
+    [storageKey, triggerHaptic, showToast]
   );
 
   const addCustomCategory = useCallback(
