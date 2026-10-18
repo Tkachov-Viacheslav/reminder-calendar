@@ -130,6 +130,7 @@ export async function deleteTeamData(supabase: any, teamId: string) {
     await supabase.from('team_category_topics').delete().eq('team_id', teamId);
     await supabase.from('team_topics').delete().eq('team_id', teamId);
     await supabase.from('team_members').delete().eq('team_id', teamId);
+    await supabase.from('team_categories').delete().eq('team_id', teamId);
     await supabase.from('teams').delete().eq('id', teamId);
   } catch (err) {
     console.error(`Failed to delete team data for ${teamId}:`, err);

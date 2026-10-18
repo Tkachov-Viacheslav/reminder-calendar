@@ -422,7 +422,7 @@ export async function handleTopicCommand(
   await sendGroupMessage(
     botToken,
     chatId,
-    `🏷️ Тему <b>#${threadId}</b> зареєстровано як <b>«${escapeHtml(topicName)}»</b>!\nВона вже доступна для вибору в календарі.`,
+    `🏷️ Тему зареєстровано як <b>«${escapeHtml(topicName)}»</b>!\nВона вже доступна для вибору в календарі.`,
     threadId,
     [],
     incomingMessageId
@@ -535,7 +535,7 @@ export async function handleMyChatMemberUpdate(mcm: any, botToken: string, siteU
   if (newStatus === 'administrator') {
     const welcome =
       `🎉 <b>Дякую! Бот отримав права Адміністратора в чаті «${title}»!</b>\n\n` +
-      `✅ Повний доступ активовано: бот бачить теми форуму та нагадування.\n\n` +
+      `✅ Повний доступ активовано.\n\n` +
       `⚙️ <b>Корисні команди:</b>\n` +
       `• <code>/sync</code> — оновити список адмінів та статус прав\n` +
       `• <code>/topic Назва</code> — зареєструвати тему форуму\n` +

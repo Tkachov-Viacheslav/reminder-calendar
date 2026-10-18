@@ -73,15 +73,32 @@ export function TeamProvider({ children }) {
 
         // Auto-join member if logged in and not yet recorded
         if (activeUserId && user) {
-          const { data: existingMember } = await supabase
+          const isCreator = Boolean(
+            teamData.created_by && String(teamData.created_by) === String(activeUserId)
+          );
+          const cleanUsername = (user.username || '').replace(/^@/, '').toLowerCase();
+
+          let { data: existingMember } = await supabase
             .from('team_members')
-            .select('role')
+            .select('id, role, telegram_id')
             .eq('team_id', activeTeamId)
             .eq('telegram_id', activeUserId)
             .maybeSingle();
 
+          if (!existingMember && cleanUsername) {
+            const { data: memberByUsername } = await supabase
+              .from('team_members')
+              .select('id, role, telegram_id')
+              .eq('team_id', activeTeamId)
+              .ilike('username', cleanUsername)
+              .maybeSingle();
+            if (memberByUsername) {
+              existingMember = memberByUsername;
+            }
+          }
+
           if (!existingMember) {
-            const role = teamData.default_role || 'editor';
+            const role = isCreator ? 'admin' : (teamData.default_role || 'editor');
             await supabase.from('team_members').insert({
               team_id: activeTeamId,
               telegram_id: activeUserId,
@@ -91,7 +108,15 @@ export function TeamProvider({ children }) {
             });
             setUserRole(role);
           } else {
-            setUserRole(existingMember.role);
+            const effectiveRole =
+              isCreator || existingMember.role === 'admin' ? 'admin' : existingMember.role;
+            if (isCreator && existingMember.role !== 'admin') {
+              await supabase
+                .from('team_members')
+                .update({ role: 'admin' })
+                .eq('id', existingMember.id);
+            }
+            setUserRole(effectiveRole);
           }
         }
       } else {
@@ -411,8 +436,13 @@ export function TeamProvider({ children }) {
     [activeTeamId, triggerHaptic, showToast]
   );
 
-  const isTeamAdmin = userRole === 'admin';
-  const canEdit = userRole === 'admin' || userRole === 'editor' || userRole === 'owner';
+  const isCreator = Boolean(
+    currentTeam?.created_by &&
+    activeUserId &&
+    String(currentTeam.created_by) === String(activeUserId)
+  );
+  const isTeamAdmin = userRole === 'admin' || userRole === 'owner' || isCreator;
+  const canEdit = isTeamAdmin || userRole === 'editor';
 
   return (
     <TeamContext.Provider

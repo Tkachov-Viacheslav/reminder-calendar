@@ -12,19 +12,32 @@ export function ReminderProvider({ children }) {
   const { activeTeamId } = useTeam();
   const { showToast } = useToast();
   const [reminders, setReminders] = useState([]);
+  const storageKey = activeTeamId ? `${LOCAL_STORAGE_KEY}_${activeTeamId}` : LOCAL_STORAGE_KEY;
+  const categoryStorageKey = activeTeamId
+    ? `reminder_team_categories_${activeTeamId}`
+    : `reminder_custom_categories_${activeUserId || 'guest'}`;
+
   const [customCategories, setCustomCategories] = useState(() => {
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_CUSTOM_CATEGORIES);
+      const stored = localStorage.getItem(categoryStorageKey);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
   });
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(categoryStorageKey);
+      setCustomCategories(stored ? JSON.parse(stored) : []);
+    } catch {
+      setCustomCategories([]);
+    }
+  }, [categoryStorageKey]);
+
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewDate, setViewDate] = useState(new Date());
-
-  const storageKey = activeTeamId ? `${LOCAL_STORAGE_KEY}_${activeTeamId}` : LOCAL_STORAGE_KEY;
 
   const loadLocalReminders = useCallback(() => {
     try {
@@ -55,34 +68,45 @@ export function ReminderProvider({ children }) {
     }
   }, [activeUserId, activeTeamId, storageKey]);
 
-  const fetchCategories = useCallback(async (remList) => {
-    let serverCats = [];
-    if (isSupabaseConfigured() && supabase && activeUserId) {
-      try {
-        const { data: catRows } = await supabase
-          .from('user_categories')
-          .select('name')
-          .eq('user_id', activeUserId);
-        if (catRows) {
-          serverCats = catRows.map((r) => r.name);
+  const fetchCategories = useCallback(
+    async (remList) => {
+      let serverCats = [];
+      if (isSupabaseConfigured() && supabase) {
+        try {
+          if (activeTeamId) {
+            const { data: catRows } = await supabase
+              .from('team_categories')
+              .select('name')
+              .eq('team_id', activeTeamId);
+            if (catRows) {
+              serverCats = catRows.map((r) => r.name);
+            }
+          } else if (activeUserId) {
+            const { data: catRows } = await supabase
+              .from('user_categories')
+              .select('name')
+              .eq('user_id', activeUserId);
+            if (catRows) {
+              serverCats = catRows.map((r) => r.name);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to fetch categories', e);
         }
-      } catch (e) {
-        console.error('Failed to fetch user categories', e);
       }
-    }
 
-    const fromReminders = (remList || [])
-      .map((r) => r.category)
-      .filter((c) => c && c !== 'main' && c !== 'other' && c !== 'personal' && c !== 'work');
+      const fromReminders = (remList || [])
+        .map((r) => r.category)
+        .filter((c) => c && c !== 'main' && c !== 'other' && c !== 'personal' && c !== 'work');
 
-    const merged = Array.from(new Set([...serverCats, ...fromReminders]));
-    if (merged.length > 0) {
+      const merged = Array.from(new Set([...serverCats, ...fromReminders]));
       setCustomCategories(merged);
       try {
-        localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(merged));
+        localStorage.setItem(categoryStorageKey, JSON.stringify(merged));
       } catch {}
-    }
-  }, [activeUserId]);
+    },
+    [activeUserId, activeTeamId, categoryStorageKey]
+  );
 
   const fetchReminders = useCallback(async () => {
     setLoading(true);
@@ -272,23 +296,30 @@ export function ReminderProvider({ children }) {
       setCustomCategories((prev) => {
         const updated = [...prev, trimmed];
         try {
-          localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+          localStorage.setItem(categoryStorageKey, JSON.stringify(updated));
         } catch {}
         return updated;
       });
 
-      if (isSupabaseConfigured() && supabase && activeUserId) {
+      if (isSupabaseConfigured() && supabase) {
         try {
-          await supabase.from('user_categories').insert({
-            user_id: activeUserId,
-            name: trimmed,
-          });
+          if (activeTeamId) {
+            await supabase.from('team_categories').insert({
+              team_id: activeTeamId,
+              name: trimmed,
+            });
+          } else if (activeUserId) {
+            await supabase.from('user_categories').insert({
+              user_id: activeUserId,
+              name: trimmed,
+            });
+          }
         } catch (e) {
           console.error('Error inserting category into Supabase', e);
         }
       }
     },
-    [customCategories, activeUserId]
+    [customCategories, activeUserId, activeTeamId, categoryStorageKey]
   );
 
   const deleteCustomCategory = useCallback(
@@ -296,24 +327,38 @@ export function ReminderProvider({ children }) {
       setCustomCategories((prev) => {
         const updated = prev.filter((c) => c !== name);
         try {
-          localStorage.setItem(LOCAL_STORAGE_CUSTOM_CATEGORIES, JSON.stringify(updated));
+          localStorage.setItem(categoryStorageKey, JSON.stringify(updated));
         } catch {}
         return updated;
       });
 
-      if (isSupabaseConfigured() && supabase && activeUserId) {
+      if (isSupabaseConfigured() && supabase) {
         try {
-          await supabase
-            .from('user_categories')
-            .delete()
-            .eq('user_id', activeUserId)
-            .eq('name', name);
+          if (activeTeamId) {
+            await supabase
+              .from('team_categories')
+              .delete()
+              .eq('team_id', activeTeamId)
+              .eq('name', name);
+
+            await supabase
+              .from('team_category_topics')
+              .delete()
+              .eq('team_id', activeTeamId)
+              .eq('category', String(name).toLowerCase().trim());
+          } else if (activeUserId) {
+            await supabase
+              .from('user_categories')
+              .delete()
+              .eq('user_id', activeUserId)
+              .eq('name', name);
+          }
         } catch (e) {
           console.error('Error deleting category from Supabase', e);
         }
       }
     },
-    [activeUserId]
+    [activeUserId, activeTeamId, categoryStorageKey]
   );
 
   return (

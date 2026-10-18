@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { LOCAL_STORAGE_USER, LOCAL_STORAGE_ACTIVE_TEAM } from '../utils/constants';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 const TelegramContext = createContext(null);
 
@@ -32,10 +33,10 @@ export function TelegramProvider({ children }) {
   const loginWithTelegram = useCallback((authResult) => {
     if (!authResult) return { success: false, error: 'Дані користувача відсутні' };
     const u = authResult.user || authResult;
-    const userId = u.sub || u.id;
+    const userId = u.id ? String(u.id) : (u.sub ? String(u.sub) : '');
     if (!userId) return { success: false, error: authResult.error || 'ID користувача відсутній' };
 
-    const username = u.preferred_username || u.username || '';
+    const username = (u.preferred_username || u.username || '').replace(/^@/, '');
     const photoUrl = u.picture || u.photo_url || (username ? `https://t.me/i/userpic/320/${username}.jpg` : '');
 
     const formattedUser = {
@@ -143,6 +144,30 @@ export function TelegramProvider({ children }) {
       });
     }
   }, [loginWithCode]);
+
+  useEffect(() => {
+    if (user?.id && String(user.id).length > 12 && user.username) {
+      if (!isSupabaseConfigured() || !supabase) return;
+      const cleanUser = user.username.replace(/^@/, '').toLowerCase();
+      supabase
+        .from('team_members')
+        .select('telegram_id')
+        .ilike('username', cleanUser)
+        .not('telegram_id', 'like', '@%')
+        .filter('telegram_id', 'not.ilike', '136116626126%')
+        .limit(1)
+        .maybeSingle()
+        .then(({ data: member }) => {
+          if (member?.telegram_id) {
+            const healed = { ...user, id: String(member.telegram_id) };
+            setUser(healed);
+            try {
+              localStorage.setItem(LOCAL_STORAGE_USER, JSON.stringify(healed));
+            } catch {}
+          }
+        });
+    }
+  }, [user]);
 
   const activeUserId = user?.id ? String(user.id) : null;
 

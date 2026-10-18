@@ -103,11 +103,6 @@ function CalendarContent() {
                 {!canEdit && ' (Режим перегляду)'}
               </span>
             </div>
-            {currentTeam.is_forum && (
-              <Badge variant="violet" size="sm">
-                💬 Форум із темами
-              </Badge>
-            )}
           </div>
         )}
 
