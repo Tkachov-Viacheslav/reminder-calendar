@@ -1,7 +1,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { TelegramProvider } from './context/TelegramContext';
+import { TelegramProvider, useTelegram } from './context/TelegramContext';
 import { TeamProvider, useTeam } from './context/TeamContext';
 import { ReminderProvider, useReminders } from './context/ReminderContext';
+import { useReminderTemplates } from './hooks/useReminderTemplates';
 import { Header } from './components/Header';
 import { CalendarHeader } from './components/Calendar/CalendarHeader';
 import { MonthView } from './components/Calendar/MonthView';
@@ -25,6 +26,9 @@ const TeamSettingsModal = lazy(() =>
 const PersonalSettingsModal = lazy(() =>
   import('./components/common/PersonalSettingsModal').then((m) => ({ default: m.PersonalSettingsModal }))
 );
+const AiPlannerModal = lazy(() =>
+  import('./components/AI/AiPlannerModal').then((m) => ({ default: m.AiPlannerModal }))
+);
 
 function CalendarContent() {
   const {
@@ -37,17 +41,50 @@ function CalendarContent() {
     updateReminder,
     isOnline,
     pendingSyncCount,
+    customCategories,
   } = useReminders();
-  const { currentTeam, canEdit } = useTeam();
+  const { currentTeam, canEdit, teamMembers, categoryTopics } = useTeam();
+  const { activeUserId } = useTelegram();
+  const { templates } = useReminderTemplates(currentTeam?.id, activeUserId);
+
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isTeamSettingsOpen, setIsTeamSettingsOpen] = useState(false);
   const [isPersonalSettingsOpen, setIsPersonalSettingsOpen] = useState(false);
+  const [isAiPlannerOpen, setIsAiPlannerOpen] = useState(false);
 
   const handleOpenNewReminder = () => {
     setEditingReminder(null);
     setIsReminderModalOpen(true);
+  };
+
+  const handleApplyAiReminder = async (data) => {
+    try {
+      const [year, month, day] = data.dateStr.split('-').map(Number);
+      const [hours, minutes] = data.timeStr.split(':').map(Number);
+      const eventDate = new Date(year, month - 1, day, hours, minutes);
+      const remindAtDate = new Date(eventDate.getTime() - (data.remindBefore || 0) * 60 * 1000);
+
+      let topicThreadId = null;
+      if (currentTeam?.id && categoryTopics?.[data.category]) {
+        topicThreadId = categoryTopics[data.category];
+      }
+
+      await addReminder({
+        title: data.title,
+        date: eventDate.toISOString(),
+        remind_at: remindAtDate.toISOString(),
+        category: data.category || 'main',
+        repeat_type: data.repeatType || 'none',
+        remind_before: data.remindBefore || 0,
+        thread_id: topicThreadId,
+        tagged_members: data.taggedMembers || [],
+        items: data.items || [],
+      });
+    } catch (err) {
+      console.error('Failed to apply AI reminder:', err);
+    }
   };
 
   const handleEditReminder = (reminder) => {
@@ -114,6 +151,7 @@ function CalendarContent() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenTeamSettings={() => setIsTeamSettingsOpen(true)}
         onOpenPersonalSettings={() => setIsPersonalSettingsOpen(true)}
+        onOpenAiPlanner={() => setIsAiPlannerOpen(true)}
       />
 
       {/* Main Container */}
@@ -227,6 +265,17 @@ function CalendarContent() {
           <PersonalSettingsModal
             isOpen={isPersonalSettingsOpen}
             onClose={() => setIsPersonalSettingsOpen(false)}
+          />
+        )}
+        {isAiPlannerOpen && (
+          <AiPlannerModal
+            isOpen={isAiPlannerOpen}
+            onClose={() => setIsAiPlannerOpen(false)}
+            onApplyReminder={handleApplyAiReminder}
+            templates={templates}
+            teamMembers={teamMembers}
+            categories={customCategories}
+            currentWorkspace={currentTeam ? currentTeam.title : 'personal'}
           />
         )}
       </Suspense>

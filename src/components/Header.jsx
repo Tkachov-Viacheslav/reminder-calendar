@@ -7,6 +7,7 @@ import {
   Users,
   Settings,
   Check,
+  Sparkles,
 } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useTeam } from '../context/TeamContext';
@@ -17,6 +18,7 @@ export function Header({
   onOpenAuth,
   onOpenTeamSettings,
   onOpenPersonalSettings,
+  onOpenAiPlanner,
 }) {
   const { user, isAuthenticated } = useTelegram();
   const {
@@ -188,6 +190,19 @@ export function Header({
               </>
             )}
           </button>
+
+          {/* AI Quick Planner button (hidden if viewer) */}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={onOpenAiPlanner}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-sm shadow-indigo-500/20 active:scale-95 transition-all"
+              title="ШІ-планувальник розкладу (Gemini)"
+            >
+              <Sparkles className="w-3.5 h-3.5 animate-pulse text-amber-200" />
+              <span className="hidden sm:inline">ШІ</span>
+            </button>
+          )}
 
           {/* Quick add button (hidden if viewer) */}
           {canEdit && (
