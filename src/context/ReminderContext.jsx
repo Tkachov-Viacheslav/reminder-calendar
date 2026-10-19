@@ -24,8 +24,10 @@ export function ReminderProvider({ children }) {
 
   const {
     customCategories,
+    categoryColors,
     fetchCategories,
     addCustomCategory,
+    updateCategoryColor,
     deleteCustomCategory,
   } = useCategories(activeTeamId, activeUserId);
 
@@ -346,6 +348,7 @@ export function ReminderProvider({ children }) {
       value={{
         reminders,
         customCategories,
+        categoryColors,
         loading,
         isOnline,
         pendingSyncCount: pendingCount,
@@ -358,6 +361,7 @@ export function ReminderProvider({ children }) {
         deleteReminder,
         clearCompletedReminders,
         addCustomCategory,
+        updateCategoryColor,
         deleteCustomCategory,
         refreshReminders: fetchReminders,
       }}

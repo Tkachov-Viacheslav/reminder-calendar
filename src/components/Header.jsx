@@ -12,7 +12,12 @@ import { useTelegram } from '../context/TelegramContext';
 import { useTeam } from '../context/TeamContext';
 import { Button } from './ui';
 
-export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
+export function Header({
+  onOpenNewReminder,
+  onOpenAuth,
+  onOpenTeamSettings,
+  onOpenPersonalSettings,
+}) {
   const { user, isAuthenticated } = useTelegram();
   const {
     userTeams,
@@ -135,12 +140,22 @@ export function Header({ onOpenNewReminder, onOpenAuth, onOpenTeamSettings }) {
             </div>
           </div>
 
-          {/* Team Settings Gear (if in team and admin) */}
-          {currentTeam && isTeamAdmin && (
+          {/* Settings Gear: Team settings if in team (admin), or Personal settings in personal calendar */}
+          {currentTeam ? (
+            isTeamAdmin && (
+              <button
+                onClick={onOpenTeamSettings}
+                className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all"
+                title="Налаштування команди"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            )
+          ) : (
             <button
-              onClick={onOpenTeamSettings}
+              onClick={onOpenPersonalSettings}
               className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all"
-              title="Налаштування команди"
+              title="Налаштування категорій та календаря"
             >
               <Settings className="w-4 h-4" />
             </button>

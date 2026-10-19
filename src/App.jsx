@@ -22,6 +22,9 @@ const AuthModal = lazy(() =>
 const TeamSettingsModal = lazy(() =>
   import('./components/Team/TeamSettingsModal').then((m) => ({ default: m.TeamSettingsModal }))
 );
+const PersonalSettingsModal = lazy(() =>
+  import('./components/common/PersonalSettingsModal').then((m) => ({ default: m.PersonalSettingsModal }))
+);
 
 function CalendarContent() {
   const {
@@ -40,6 +43,7 @@ function CalendarContent() {
   const [editingReminder, setEditingReminder] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isTeamSettingsOpen, setIsTeamSettingsOpen] = useState(false);
+  const [isPersonalSettingsOpen, setIsPersonalSettingsOpen] = useState(false);
 
   const handleOpenNewReminder = () => {
     setEditingReminder(null);
@@ -109,6 +113,7 @@ function CalendarContent() {
         onOpenNewReminder={handleOpenNewReminder}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenTeamSettings={() => setIsTeamSettingsOpen(true)}
+        onOpenPersonalSettings={() => setIsPersonalSettingsOpen(true)}
       />
 
       {/* Main Container */}
@@ -216,6 +221,12 @@ function CalendarContent() {
           <TeamSettingsModal
             isOpen={isTeamSettingsOpen}
             onClose={() => setIsTeamSettingsOpen(false)}
+          />
+        )}
+        {isPersonalSettingsOpen && (
+          <PersonalSettingsModal
+            isOpen={isPersonalSettingsOpen}
+            onClose={() => setIsPersonalSettingsOpen(false)}
           />
         )}
       </Suspense>

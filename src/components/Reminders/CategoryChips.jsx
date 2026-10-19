@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Check, X } from 'lucide-react';
-import { SYSTEM_CATEGORIES, getCategoryMeta } from '../../utils/constants';
+import { SYSTEM_CATEGORIES, getCategoryMeta, CATEGORY_COLOR_PALETTES } from '../../utils/constants';
 
 export function CategoryChips({
   category,
@@ -11,6 +11,7 @@ export function CategoryChips({
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
+  const [selectedColorId, setSelectedColorId] = useState('emerald');
   const [confirmDeleteCat, setConfirmDeleteCat] = useState(null);
   const safeCustom = Array.isArray(customCategories)
     ? customCategories.filter((c) => Boolean(c && String(c).trim()))
@@ -26,8 +27,9 @@ export function CategoryChips({
     if (e) e.preventDefault();
     const trimmed = newCatInput.trim();
     if (!trimmed) return;
-    onAddCustomCategory(trimmed);
+    onAddCustomCategory(trimmed, selectedColorId);
     setNewCatInput('');
+    setSelectedColorId('emerald');
     setIsAdding(false);
   };
 
@@ -36,6 +38,7 @@ export function CategoryChips({
     if (e.key === 'Escape') {
       setIsAdding(false);
       setNewCatInput('');
+      setSelectedColorId('emerald');
     }
   };
 
@@ -135,36 +138,53 @@ export function CategoryChips({
 
         {/* Add custom category button or input */}
         {isAdding ? (
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              autoFocus
-              placeholder="Назва..."
-              maxLength={20}
-              value={newCatInput}
-              onChange={(e) => setNewCatInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              className="px-2 py-0.5 text-xs bg-slate-50 dark:bg-slate-800 border border-indigo-400 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none w-24"
-            />
-            <button
-              type="button"
-              onClick={handleAddSubmit}
-              className="p-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg"
-              title="Зберегти категорію"
-            >
-              <Check className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdding(false);
-                setNewCatInput('');
-              }}
-              className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-              title="Скасувати"
-            >
-              <X className="w-3 h-3" />
-            </button>
+          <div className="flex flex-col gap-1.5 p-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 animate-fadeIn">
+            <div className="flex items-center gap-1">
+              <input
+                type="text"
+                autoFocus
+                placeholder="Назва..."
+                maxLength={20}
+                value={newCatInput}
+                onChange={(e) => setNewCatInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="px-2 py-0.5 text-xs bg-white dark:bg-slate-800 border border-indigo-400 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none w-28"
+              />
+              <button
+                type="button"
+                onClick={handleAddSubmit}
+                className="p-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                title="Зберегти категорію"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdding(false);
+                  setNewCatInput('');
+                  setSelectedColorId('emerald');
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors"
+                title="Скасувати"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            {/* Color selection row */}
+            <div className="flex items-center gap-1 overflow-x-auto py-0.5 max-w-[190px] scrollbar-none">
+              {CATEGORY_COLOR_PALETTES.map((pal) => (
+                <button
+                  key={pal.id}
+                  type="button"
+                  title={pal.label}
+                  onClick={() => setSelectedColorId(pal.id)}
+                  className={`w-3.5 h-3.5 rounded-full flex-shrink-0 transition-transform ${pal.dotColor} ${
+                    selectedColorId === pal.id ? 'scale-125 ring-2 ring-indigo-500 ring-offset-1' : 'hover:scale-110 opacity-80'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         ) : (
           <button

@@ -151,7 +151,7 @@ export function useReminderForm({
     setItems((prev) => prev.filter((it) => it.id !== id));
   }, [triggerHaptic]);
 
-  const handleAddCategory = useCallback(async (name) => {
+  const handleAddCategory = useCallback(async (name, colorId) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     if (trimmed.toLowerCase() === 'головне' || trimmed.toLowerCase() === 'main') {
@@ -162,7 +162,7 @@ export function useReminderForm({
       setCategory('other');
       return;
     }
-    await addCustomCategory(trimmed);
+    await addCustomCategory(trimmed, colorId);
     setCategory(trimmed);
     triggerHaptic('light');
   }, [addCustomCategory, triggerHaptic]);

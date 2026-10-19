@@ -98,10 +98,22 @@ CREATE TABLE IF NOT EXISTS public.user_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL,
     name TEXT NOT NULL,
+    color TEXT DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_categories_uid ON public.user_categories (user_id);
+
+-- 8.1. ТАБЛИЦЯ КОМАНДНИХ КАТЕГОРІЙ (team_categories)
+CREATE TABLE IF NOT EXISTS public.team_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id TEXT NOT NULL REFERENCES public.teams(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    color TEXT DEFAULT '',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_categories_tid ON public.team_categories (team_id);
 
 -- 9. ТАБЛИЦЯ СПІЛЬНИХ ШАБЛОНІВ КОМАНД (team_templates)
 CREATE TABLE IF NOT EXISTS public.team_templates (
@@ -135,6 +147,7 @@ ALTER TABLE public.team_category_topics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auth_codes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_digests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_templates ENABLE ROW LEVEL SECURITY;
 
 -- Політики публічного доступу для веб-додатку
@@ -146,4 +159,5 @@ CREATE POLICY "Allow public all team_category_topics" ON public.team_category_to
 CREATE POLICY "Allow public all auth_codes" ON public.auth_codes FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all user_digests" ON public.user_digests FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all user_categories" ON public.user_categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow public all team_categories" ON public.team_categories FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow public all team_templates" ON public.team_templates FOR ALL USING (true) WITH CHECK (true);
