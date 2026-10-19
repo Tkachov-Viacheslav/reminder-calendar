@@ -82,6 +82,19 @@ export const MonthView = React.memo(function MonthView({
           const isSelected = isSameDay(item.date, selectedDate);
           const today = isToday(item.date);
 
+          // Active reminders first for dots display
+          const sortedDayReminders = [...dayReminders].sort((a, b) => {
+            if (Boolean(a.is_sent) !== Boolean(b.is_sent)) {
+              return a.is_sent ? 1 : -1;
+            }
+            return new Date(a.remind_at) - new Date(b.remind_at);
+          });
+
+          const displayedDots = sortedDayReminders.slice(0, 3);
+          const activeCount = dayReminders.filter((r) => !r.is_sent).length;
+          const activeInDots = displayedDots.filter((r) => !r.is_sent).length;
+          const remainingActiveCount = Math.max(0, activeCount - activeInDots);
+
           const fullDateLabel = item.date.toLocaleDateString('uk-UA', {
             day: 'numeric',
             month: 'long',
@@ -128,21 +141,33 @@ export const MonthView = React.memo(function MonthView({
 
               {/* Reminders dots indicator */}
               <div className="w-full flex items-center justify-center gap-1 mt-1 overflow-hidden px-1">
-                {dayReminders.slice(0, 3).map((r, i) => {
+                {displayedDots.map((r, i) => {
                   const category = getCategoryMeta(r.category);
+                  const isDone = Boolean(r.is_sent);
+                  const dotColorClass = isSelected
+                    ? isDone
+                      ? 'bg-white/40'
+                      : 'bg-white'
+                    : isDone
+                    ? 'bg-slate-300 dark:bg-slate-600'
+                    : category.dotColor;
+
                   return (
                     <span
                       key={r.id || i}
-                      className={`w-1.5 h-1.5 rounded-full transition-transform ${
-                        isSelected ? 'bg-white' : category.dotColor
-                      }`}
-                      title={r.title}
+                      className={`w-1.5 h-1.5 rounded-full transition-transform ${dotColorClass}`}
+                      title={`${r.title}${isDone ? ' (виконано)' : ''}`}
                     />
                   );
                 })}
-                {dayReminders.length > 3 && (
-                  <span className={`text-[9px] font-bold ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>
-                    +{dayReminders.length - 3}
+                {remainingActiveCount > 0 && (
+                  <span
+                    className={`text-[9px] font-bold ${
+                      isSelected ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-500'
+                    }`}
+                    title={`Ще ${remainingActiveCount} активних нагадувань`}
+                  >
+                    +{remainingActiveCount}
                   </span>
                 )}
               </div>

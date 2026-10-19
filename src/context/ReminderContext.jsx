@@ -316,6 +316,31 @@ export function ReminderProvider({ children }) {
     [reminders, storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
   );
 
+  const clearCompletedReminders = useCallback(
+    async (ids) => {
+      if (!Array.isArray(ids) || ids.length === 0) return;
+      triggerHaptic('medium');
+      const idsSet = new Set(ids);
+
+      setReminders((prev) => {
+        const updated = prev.filter((r) => !idsSet.has(r.id));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+        return updated;
+      });
+
+      if (isOnline && isSupabaseConfigured() && supabase) {
+        try {
+          await supabase.from('reminders').delete().in('id', ids);
+        } catch (e) {
+          console.warn('Network issue clearing completed from Supabase', e);
+        }
+      }
+
+      showToast(`Очищено ${ids.length} виконаних нагадувань`, 'success');
+    },
+    [storageKey, isOnline, triggerHaptic, showToast]
+  );
+
   return (
     <ReminderContext.Provider
       value={{
@@ -331,6 +356,7 @@ export function ReminderProvider({ children }) {
         addReminder,
         updateReminder,
         deleteReminder,
+        clearCompletedReminders,
         addCustomCategory,
         deleteCustomCategory,
         refreshReminders: fetchReminders,

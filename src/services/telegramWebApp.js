@@ -6,18 +6,40 @@ export function getTelegramWebApp() {
   return window?.Telegram?.WebApp || null;
 }
 
-export function initTelegramWebApp() {
+let isThemeListenerRegistered = false;
+
+export function applyTelegramTheme() {
   const tg = getTelegramWebApp();
-  if (!tg) return null;
+  if (typeof document === 'undefined') return;
 
-  try {
-    tg.ready();
-    tg.expand();
-    tg.setHeaderColor?.('#0f172a');
-    tg.setBackgroundColor?.('#020617');
+  const root = document.documentElement;
+  const isDark = tg?.colorScheme === 'dark';
 
-    if (tg.themeParams && typeof document !== 'undefined') {
-      const root = document.documentElement;
+  if (isDark) {
+    root.classList.add('dark');
+    root.style.colorScheme = 'dark';
+  } else {
+    root.classList.remove('dark');
+    root.style.colorScheme = 'light';
+  }
+
+  if (tg) {
+    try {
+      const isVersionAtLeast =
+        typeof tg.isVersionAtLeast === 'function' ? tg.isVersionAtLeast.bind(tg) : null;
+
+      if (isVersionAtLeast && isVersionAtLeast('6.9')) {
+        tg.setHeaderColor?.(isDark ? '#0f172a' : '#ffffff');
+        tg.setBackgroundColor?.(isDark ? '#020617' : '#f8fafc');
+      } else if (isVersionAtLeast && isVersionAtLeast('6.1')) {
+        tg.setHeaderColor?.('secondary_bg_color');
+        tg.setBackgroundColor?.('bg_color');
+      }
+    } catch {
+      // Non-critical if header/background color is unsupported
+    }
+
+    if (tg.themeParams) {
       const tp = tg.themeParams;
       if (tp.bg_color) root.style.setProperty('--tg-theme-bg-color', tp.bg_color);
       if (tp.text_color) root.style.setProperty('--tg-theme-text-color', tp.text_color);
@@ -25,6 +47,22 @@ export function initTelegramWebApp() {
       if (tp.button_color) root.style.setProperty('--tg-theme-button-color', tp.button_color);
       if (tp.button_text_color) root.style.setProperty('--tg-theme-button-text-color', tp.button_text_color);
       if (tp.secondary_bg_color) root.style.setProperty('--tg-theme-secondary-bg-color', tp.secondary_bg_color);
+    }
+  }
+}
+
+export function initTelegramWebApp() {
+  const tg = getTelegramWebApp();
+  if (!tg) return null;
+
+  try {
+    tg.ready();
+    tg.expand();
+    applyTelegramTheme();
+
+    if (!isThemeListenerRegistered && typeof tg.onEvent === 'function') {
+      tg.onEvent('themeChanged', applyTelegramTheme);
+      isThemeListenerRegistered = true;
     }
   } catch {
     // Non-critical if theme configuration fails

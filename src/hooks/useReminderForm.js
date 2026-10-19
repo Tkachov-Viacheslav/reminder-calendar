@@ -238,7 +238,9 @@ export function useReminderForm({
       if (template.category) setCategory(template.category);
       if (template.repeatType) setRepeatType(template.repeatType);
       if (template.remindBefore !== undefined) setRemindBefore(template.remindBefore);
+      if (template.timeStr || template.time) setTimeStr(template.timeStr || template.time);
       if (Array.isArray(template.items)) setItems([...template.items]);
+      if (Array.isArray(template.taggedMembers)) setTaggedMembers([...template.taggedMembers]);
     },
     [triggerHaptic]
   );

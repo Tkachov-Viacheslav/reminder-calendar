@@ -18,7 +18,7 @@ export function ReminderModal({
   initialDate,
   editingReminder,
 }) {
-  const { triggerHaptic, setClosingConfirmation } = useTelegram();
+  const { triggerHaptic, setClosingConfirmation, activeUserId } = useTelegram();
   const { currentTeam, teamMembers, teamTopics, categoryTopics } = useTeam();
   const { customCategories } = useReminders();
 
@@ -38,20 +38,25 @@ export function ReminderModal({
     onClose,
   });
 
-  const { templates, saveTemplate, deleteTemplate } = useReminderTemplates(
+  const { templates, saveTemplate, deleteTemplate, isTeamTemplates } = useReminderTemplates(
     currentTeam?.id,
-    currentTeam ? null : undefined
+    activeUserId
   );
 
-  const handleSaveCurrentAsTemplate = () => {
-    saveTemplate({
-      title: form.title,
-      category: form.category,
-      description: form.description,
-      remindBefore: form.remindBefore,
-      repeatType: form.repeatType,
-      items: form.items,
-    });
+  const handleSaveCurrentAsTemplate = (overwriteId = null) => {
+    saveTemplate(
+      {
+        title: form.title,
+        category: form.category,
+        description: form.description,
+        remindBefore: form.remindBefore,
+        repeatType: form.repeatType,
+        items: form.items,
+        timeStr: form.timeStr,
+        taggedMembers: form.taggedMembers,
+      },
+      overwriteId ? { overwriteId } : {}
+    );
   };
 
   if (!isOpen) return null;
@@ -85,6 +90,7 @@ export function ReminderModal({
             onSaveCurrentAsTemplate={handleSaveCurrentAsTemplate}
             onDeleteTemplate={deleteTemplate}
             currentTitle={form.title}
+            isTeam={isTeamTemplates}
           />
         )}
 
