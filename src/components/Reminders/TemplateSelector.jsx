@@ -110,20 +110,10 @@ export function TemplateSelector({
                 <button
                   type="button"
                   onClick={() => handleApply(tpl)}
-                  className="font-medium truncate max-w-[130px] text-left flex items-center gap-1.5"
-                  title={`Застосувати шаблон «${tpl.name}»`}
+                  className="font-medium truncate max-w-[140px] text-left"
+                  title={`Застосувати шаблон «${tpl.name}»${tpl.timeStr ? ` (${tpl.timeStr})` : ''}`}
                 >
                   <span>{tpl.name}</span>
-                  {tpl.timeStr && (
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                      {tpl.timeStr}
-                    </span>
-                  )}
-                  {Array.isArray(tpl.taggedMembers) && tpl.taggedMembers.length > 0 && (
-                    <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold">
-                      👥{tpl.taggedMembers.length}
-                    </span>
-                  )}
                 </button>
 
                 <button
