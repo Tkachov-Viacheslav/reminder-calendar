@@ -13,6 +13,7 @@ import {
   formatTelegramUser,
   verifyAuthCodeWithApi,
   verifyInitDataWithApi,
+  verifyTelegramAuthWithApi,
   healTelegramUserId,
 } from '../services/authService';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
@@ -27,16 +28,29 @@ export function TelegramProvider({ children }) {
     return false;
   });
 
-  const loginWithTelegram = useCallback((authResult) => {
-    const formattedUser = formatTelegramUser(authResult);
-    if (!formattedUser) {
-      return { success: false, error: authResult?.error || 'ID користувача відсутній' };
-    }
+  const loginWithTelegram = useCallback(async (authResult) => {
+    triggerHaptic('light');
+    try {
+      const result = await verifyTelegramAuthWithApi(authResult);
+      if (result.success && result.user) {
+        setUser(result.user);
+        saveStoredUser(result.user);
+        setHasSession(true);
+        triggerHaptic('success');
+        return result;
+      }
 
-    setUser(formattedUser);
-    saveStoredUser(formattedUser);
-    triggerHaptic('success');
-    return { success: true, user: formattedUser };
+      const formattedUser = formatTelegramUser(authResult);
+      if (formattedUser) {
+        setUser(formattedUser);
+        saveStoredUser(formattedUser);
+      }
+      triggerHaptic('error');
+      return result;
+    } catch {
+      triggerHaptic('error');
+      return { success: false, error: 'Помилка мережі при перевірці Telegram авторизації' };
+    }
   }, []);
 
   const loginWithCode = useCallback(async (code) => {

@@ -54,20 +54,22 @@ export function AuthModal({ isOpen, onClose }) {
           request_access: ['write'],
           lang: 'uk',
         },
-        (result) => {
-          setTgLoading(false);
+        async (result) => {
           if (!result || result.error) {
+            setTgLoading(false);
             if (result?.error && result.error !== 'popup_closed') {
               setError(`Помилка Telegram: ${result.error}`);
             }
             return;
           }
 
-          const res = loginWithTelegram(result);
-          if (res.success) {
+          const res = await loginWithTelegram(result);
+          setTgLoading(false);
+          if (res?.success) {
+            showToast('Успішний вхід через Telegram!', 'success');
             onClose();
           } else {
-            setError(res.error || 'Помилка авторизації');
+            setError(res?.error || 'Помилка авторизації');
           }
         }
       );

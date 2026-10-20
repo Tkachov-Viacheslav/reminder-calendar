@@ -48,6 +48,42 @@ async function verifyTelegramWebAppData(initData: string, botToken: string): Pro
   }
 }
 
+async function verifyTelegramWidgetData(authData: Record<string, any>, botToken: string): Promise<boolean> {
+  try {
+    const { hash, ...data } = authData;
+    if (!hash) return false;
+
+    const entries: string[] = [];
+    for (const [key, val] of Object.entries(data)) {
+      if (val !== undefined && val !== null) {
+        entries.push(`${key}=${val}`);
+      }
+    }
+    entries.sort();
+    const dataCheckString = entries.join('\n');
+
+    const encoder = new TextEncoder();
+    const secretHash = await crypto.subtle.digest('SHA-256', encoder.encode(botToken));
+
+    const hmacKey = await crypto.subtle.importKey(
+      'raw',
+      secretHash,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const sig = await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(dataCheckString));
+    const computedHex = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    return computedHex.toLowerCase() === String(hash).toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 async function getOrCreateUserSession(
   supabaseAdmin: any,
   supabaseUrl: string,
@@ -161,6 +197,46 @@ Deno.serve(async (req: Request) => {
         anonKey,
         botToken,
         tgUser.id,
+        userData
+      );
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          user: userData,
+          session,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 1.1. Верифікація Telegram Login Widget (вхід через Telegram у звичайному браузері)
+    if (body.telegramAuth) {
+      const authData = body.telegramAuth;
+      const isValid = await verifyTelegramWidgetData(authData, botToken);
+      if (!isValid) {
+        return new Response(JSON.stringify({ error: 'Недійсний підпис авторизації Telegram' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const photoUrl =
+        authData.photo_url ||
+        (authData.username ? `https://t.me/i/userpic/320/${authData.username}.jpg` : '');
+      const userData = {
+        id: String(authData.id),
+        first_name: authData.first_name || '',
+        username: authData.username || '',
+        photo_url: photoUrl,
+      };
+
+      const session = await getOrCreateUserSession(
+        supabase,
+        supabaseUrl,
+        anonKey,
+        botToken,
+        authData.id,
         userData
       );
 

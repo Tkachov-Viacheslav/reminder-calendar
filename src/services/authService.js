@@ -116,6 +116,42 @@ export async function verifyInitDataWithApi(initData) {
   return { success: false };
 }
 
+export async function verifyTelegramAuthWithApi(authData) {
+  if (!authData || !authData.hash) return { success: false, error: 'Дані авторизації відсутні' };
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dwzswscabsphwprptnos.supabase.co';
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (anonKey) {
+    headers['apikey'] = anonKey;
+    headers['Authorization'] = `Bearer ${anonKey}`;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ telegramAuth: authData }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok && data.user) {
+      if (data.session && supabase?.auth) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        } catch (e) {
+          console.warn('Failed to set Supabase auth session from telegramAuth:', e);
+        }
+      }
+      return { success: true, user: data.user, session: data.session };
+    }
+    return { success: false, error: data?.error || 'Помилка авторизації Telegram' };
+  } catch {
+    return { success: false, error: 'Помилка мережі при авторизації' };
+  }
+}
+
 export async function healTelegramUserId(user) {
   if (!user?.id || String(user.id).length <= 12 || !user.username) {
     return null;
