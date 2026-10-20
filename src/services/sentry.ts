@@ -21,11 +21,20 @@ export function initSentry(): void {
           maskAllText: false,
           blockAllMedia: false,
         }),
+        Sentry.consoleLoggingIntegration({
+          levels: ['log', 'info', 'warn', 'error'],
+        }),
       ],
       tracesSampleRate: 0.3,
       replaysSessionSampleRate: 0.1,
       replaysOnErrorSampleRate: 1.0,
       environment: import.meta.env.MODE || 'production',
+    });
+
+    // Відправляємо структурований лог для верифікації пайплайну Sentry Logs
+    Sentry.logger.info('Календар-нагадування успішно ініціалізовано', {
+      app: 'reminder-calendar',
+      version: '1.0.1',
     });
   } catch (err) {
     console.warn('Failed to initialize Sentry:', err);
@@ -47,5 +56,23 @@ export function recordMetric(
     if (Sentry.metrics && typeof Sentry.metrics[type] === 'function') {
       Sentry.metrics[type](name, value);
     }
+  } catch {}
+}
+
+export function logInfo(message: string, attributes?: Record<string, unknown>): void {
+  try {
+    Sentry.logger.info(message, attributes);
+  } catch {}
+}
+
+export function logWarn(message: string, attributes?: Record<string, unknown>): void {
+  try {
+    Sentry.logger.warn(message, attributes);
+  } catch {}
+}
+
+export function logError(message: string, attributes?: Record<string, unknown>): void {
+  try {
+    Sentry.logger.error(message, attributes);
   } catch {}
 }
