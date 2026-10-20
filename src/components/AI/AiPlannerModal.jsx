@@ -51,6 +51,13 @@ export function AiPlannerModal({
 
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
+  const conversationIdRef = useRef(`conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+
+  useEffect(() => {
+    if (isOpen) {
+      conversationIdRef.current = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+  }, [isOpen]);
 
   const handleSelectChip = (chipPrompt) => {
     setPrompt(chipPrompt);
@@ -137,6 +144,7 @@ export function AiPlannerModal({
     try {
       const result = await parseReminderWithAi({
         text: query,
+        conversationId: conversationIdRef.current,
         context: {
           now: `${nowStr} (ISO: ${new Date().toISOString()})`,
           templates,

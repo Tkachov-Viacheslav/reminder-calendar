@@ -1,5 +1,6 @@
 import { LOCAL_STORAGE_USER, LOCAL_STORAGE_ACTIVE_TEAM } from '../utils/constants';
 import { supabase, isSupabaseConfigured } from './supabase';
+import { captureClientError } from './sentry';
 
 export function getStoredUser() {
   try {
@@ -68,30 +69,35 @@ export async function verifyAuthCodeWithApi(code) {
     headers['Authorization'] = `Bearer ${anonKey}`;
   }
 
-  const res = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ code: String(code).trim() }),
-  });
-  const data = await res.json();
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ code: String(code).trim() }),
+    });
+    const data = await res.json();
 
-  if (res.ok && data.ok && data.user) {
-    if (data.session && supabase?.auth) {
-      try {
-        await supabase.auth.setSession({
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-        });
-      } catch (e) {
-        console.warn('Failed to set Supabase auth session:', e);
+    if (res.ok && data.ok && data.user) {
+      if (data.session && supabase?.auth) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        } catch (e) {
+          console.warn('Failed to set Supabase auth session:', e);
+        }
       }
+      const u = data.user;
+      const photoUrl = u.photo_url || (u.username ? `https://t.me/i/userpic/320/${u.username}.jpg` : '');
+      return { success: true, user: { ...u, photo_url: photoUrl } };
     }
-    const u = data.user;
-    const photoUrl = u.photo_url || (u.username ? `https://t.me/i/userpic/320/${u.username}.jpg` : '');
-    return { success: true, user: { ...u, photo_url: photoUrl } };
-  }
 
-  return { success: false, error: data?.error || 'Невірний код' };
+    return { success: false, error: data?.error || 'Невірний код' };
+  } catch (err) {
+    captureClientError(err, { endpoint: '/functions/v1/verify-code', action: 'verifyAuthCode' });
+    return { success: false, error: 'Помилка мережі при перевірці коду' };
+  }
 }
 
 export async function verifyInitDataWithApi(initData) {
@@ -124,7 +130,9 @@ export async function verifyInitDataWithApi(initData) {
       }
       return { success: true, user: data.user };
     }
-  } catch {}
+  } catch (err) {
+    captureClientError(err, { endpoint: '/functions/v1/verify-code', action: 'verifyInitData' });
+  }
   return { success: false };
 }
 
@@ -166,7 +174,8 @@ export async function verifyTelegramAuthWithApi(authData) {
       return { success: true, user: data.user, session: data.session };
     }
     return { success: false, error: data?.error || 'Помилка авторизації Telegram' };
-  } catch {
+  } catch (err) {
+    captureClientError(err, { endpoint: '/functions/v1/verify-code', action: 'verifyTelegramAuth' });
     return { success: false, error: 'Помилка мережі при авторизації' };
   }
 }

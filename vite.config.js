@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -52,12 +53,23 @@ export default defineConfig(({ mode }) => {
           });
         },
       },
+      sentryVitePlugin({
+        org: env.SENTRY_ORG || process.env.SENTRY_ORG || 'veter-26',
+        project: env.SENTRY_PROJECT || process.env.SENTRY_PROJECT || 'sentry-byzantine-park',
+        authToken: env.SENTRY_AUTH_TOKEN || process.env.SENTRY_AUTH_TOKEN,
+        telemetry: false,
+        disable: !env.SENTRY_AUTH_TOKEN && !process.env.SENTRY_AUTH_TOKEN,
+      }),
     ],
     server: {
       port: 3000,
+      headers: {
+        'Document-Policy': 'js-profiling',
+      },
     },
     envPrefix: ['VITE_', 'SENTRY_', 'NEXT_PUBLIC_'],
     build: {
+      sourcemap: true,
       rollupOptions: {
         output: {
           manualChunks(id) {

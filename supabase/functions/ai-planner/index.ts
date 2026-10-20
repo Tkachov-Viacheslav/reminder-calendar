@@ -63,7 +63,7 @@ const RESPONSE_SCHEMA = {
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, sentry-trace, baggage',
 };
 
 Deno.serve(async (req: Request) => {
@@ -229,6 +229,14 @@ Deno.serve(async (req: Request) => {
       }
     } catch (parseErr) {
       console.error('JSON parse error from Gemini:', rawOutput, parseErr);
+    }
+
+    if (parsed && geminiData?.usageMetadata) {
+      parsed.usage = {
+        promptTokens: geminiData.usageMetadata.promptTokenCount,
+        outputTokens: geminiData.usageMetadata.candidatesTokenCount,
+        totalTokens: geminiData.usageMetadata.totalTokenCount,
+      };
     }
 
     return new Response(JSON.stringify(parsed || { status: 'ERROR', message: 'Не вдалося розібрати відповідь ШІ' }), {

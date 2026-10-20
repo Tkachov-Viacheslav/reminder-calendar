@@ -13,7 +13,7 @@ import { trackUserAction } from '../services/analytics';
 const ReminderContext = createContext(null);
 
 export function ReminderProvider({ children }) {
-  const { user, activeUserId, isAuthenticated, triggerHaptic } = useTelegram();
+  const { user, activeUserId, isAuthenticated, hasSession, triggerHaptic } = useTelegram();
   const { activeTeamId } = useTeam();
   const { showToast } = useToast();
   const storageKey = activeTeamId ? `${LOCAL_STORAGE_KEY}_${activeTeamId}` : LOCAL_STORAGE_KEY;
@@ -139,6 +139,8 @@ export function ReminderProvider({ children }) {
   });
 
   const { isOnline, pendingCount, enqueueMutation } = useOfflineQueue({
+    activeUserId,
+    hasSession,
     onSyncSuccess: fetchReminders,
   });
 
