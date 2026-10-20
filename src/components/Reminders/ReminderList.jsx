@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { Bell, Calendar as CalendarIcon } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ReminderCard } from './ReminderCard';
 import { ReminderFilters } from './ReminderFilters';
 import { formatDateUkrainian, isSameDay } from '../../utils/dateUtils';
@@ -138,6 +139,14 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
     setOnlyMine(false);
   };
 
+  const parentRef = useRef(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filteredList.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 110,
+    overscan: 4,
+  });
+
   return (
     <Card variant="muted" className="flex flex-col h-full reminders-container">
       {/* List Header */}
@@ -180,7 +189,10 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
       />
 
       {/* List or Empty State */}
-      <div className="flex-1 overflow-y-auto my-2.5 space-y-2.5 max-h-[440px] pr-1 @container">
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-y-auto my-2.5 max-h-[440px] pr-1 @container"
+      >
         {filteredList.length === 0 ? (
           <div className="py-8 px-4 text-center flex flex-col items-center justify-center">
             <div className="p-3 rounded-full bg-indigo-50 dark:bg-indigo-950/40 text-indigo-500 mb-2.5">
@@ -207,17 +219,41 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
             )}
           </div>
         ) : (
-          filteredList.map((rem) => (
-            <ReminderCard
-              key={rem.id}
-              reminder={rem}
-              canEdit={canEdit}
-              onToggleSent={handleToggleSent}
-              onDelete={deleteReminder}
-              onEdit={onEditReminder}
-              onUpdate={updateReminder}
-            />
-          ))
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const rem = filteredList[virtualRow.index];
+              return (
+                <div
+                  key={rem.id}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                    paddingBottom: '10px',
+                  }}
+                >
+                  <ReminderCard
+                    reminder={rem}
+                    canEdit={canEdit}
+                    onToggleSent={handleToggleSent}
+                    onDelete={deleteReminder}
+                    onEdit={onEditReminder}
+                    onUpdate={updateReminder}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </Card>

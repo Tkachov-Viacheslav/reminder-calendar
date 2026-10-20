@@ -1,4 +1,20 @@
-export const SYSTEM_CATEGORIES = {
+export interface CategoryInfo {
+  id: string;
+  label: string;
+  color: string;
+  dotColor: string;
+  accentColor: string;
+}
+
+export interface ColorPalette {
+  id: string;
+  label: string;
+  color: string;
+  dotColor: string;
+  hex: string;
+}
+
+export const SYSTEM_CATEGORIES: Record<string, CategoryInfo> = {
   main: {
     id: 'main',
     label: 'Головне',
@@ -24,7 +40,7 @@ export const LOCAL_STORAGE_CUSTOM_CATEGORIES = 'reminder_custom_categories_v1';
 export const LOCAL_STORAGE_ACTIVE_TEAM = 'reminder_active_team_v1';
 export const LOCAL_STORAGE_GEMINI_API_KEY = 'reminder_gemini_api_key';
 
-export const CATEGORY_COLOR_PALETTES = [
+export const CATEGORY_COLOR_PALETTES: ColorPalette[] = [
   { id: 'emerald', label: 'Смарагдовий', color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30', dotColor: 'bg-emerald-500', hex: '#10b981' },
   { id: 'amber', label: 'Бурштиновий', color: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30', dotColor: 'bg-amber-500', hex: '#f59e0b' },
   { id: 'purple', label: 'Пурпурний', color: 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30', dotColor: 'bg-purple-500', hex: '#a855f7' },
@@ -39,22 +55,21 @@ export const CATEGORY_COLOR_PALETTES = [
   { id: 'blue', label: 'Синій', color: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30', dotColor: 'bg-blue-500', hex: '#3b82f6' },
 ];
 
-let customCategoryColorRegistry = {};
+let customCategoryColorRegistry: Record<string, string> = {};
 
-export function setCustomCategoryColors(colorsMap) {
+export function setCustomCategoryColors(colorsMap: Record<string, string>): void {
   if (colorsMap && typeof colorsMap === 'object') {
     customCategoryColorRegistry = { ...customCategoryColorRegistry, ...colorsMap };
   }
 }
 
-export function getCategoryMeta(catIdOrName) {
+export function getCategoryMeta(catIdOrName?: string | null): CategoryInfo {
   if (!catIdOrName) return SYSTEM_CATEGORIES.other;
   const key = String(catIdOrName).toLowerCase().trim();
 
   if (key === 'main' || key === 'головне') return SYSTEM_CATEGORIES.main;
   if (key === 'other' || key === 'інше') return SYSTEM_CATEGORIES.other;
 
-  // 1. Check if user configured an explicit color for this category
   const customColorId = customCategoryColorRegistry[key];
   if (customColorId) {
     const matched = CATEGORY_COLOR_PALETTES.find((p) => p.id === customColorId);
@@ -69,7 +84,6 @@ export function getCategoryMeta(catIdOrName) {
     }
   }
 
-  // 2. Fallbacks for standard legacy names
   if (key === 'personal' || key === 'особисте') {
     return {
       id: catIdOrName,
@@ -89,7 +103,6 @@ export function getCategoryMeta(catIdOrName) {
     };
   }
 
-  // 3. Deterministic hash fallback across the 12 rich palettes
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
     hash = (hash << 5) - hash + key.charCodeAt(i);

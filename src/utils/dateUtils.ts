@@ -1,11 +1,11 @@
-export const MONTH_NAMES_UA = [
+export const MONTH_NAMES_UA: readonly string[] = [
   'Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
   'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'
 ];
 
-export const WEEKDAY_NAMES_UA = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+export const WEEKDAY_NAMES_UA: readonly string[] = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
-export function toISODateString(date) {
+export function toISODateString(date?: Date | string | null): string {
   if (!date) return '';
   const d = new Date(date);
   if (isNaN(d.getTime())) return '';
@@ -15,7 +15,7 @@ export function toISODateString(date) {
   return `${year}-${month}-${day}`;
 }
 
-export function isSameDay(d1, d2) {
+export function isSameDay(d1?: Date | string | null, d2?: Date | string | null): boolean {
   if (!d1 || !d2) return false;
   const date1 = new Date(d1);
   const date2 = new Date(d2);
@@ -27,11 +27,11 @@ export function isSameDay(d1, d2) {
   );
 }
 
-export function isToday(date) {
+export function isToday(date?: Date | string | null): boolean {
   return isSameDay(date, new Date());
 }
 
-export function formatDateUkrainian(date) {
+export function formatDateUkrainian(date?: Date | string | null): string {
   if (!date) return '';
   const d = new Date(date);
   if (isNaN(d.getTime())) return '';
@@ -41,7 +41,7 @@ export function formatDateUkrainian(date) {
   return `${day} ${monthName} ${year}`;
 }
 
-export function formatTime(isoString) {
+export function formatTime(isoString?: string | null): string {
   if (!isoString) return '';
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return '';
@@ -50,20 +50,23 @@ export function formatTime(isoString) {
   return `${hours}:${minutes}`;
 }
 
-export function getMonthMatrix(year, month) {
+export interface MonthDay {
+  date: Date;
+  isCurrentMonth: boolean;
+}
+
+export function getMonthMatrix(year: number, month: number): MonthDay[] {
   const firstDayOfMonth = new Date(year, month, 1);
   const lastDayOfMonth = new Date(year, month + 1, 0);
 
-  // Convert Sunday (0) to 6, Monday (1) to 0
   let startingDayOfWeek = firstDayOfMonth.getDay() - 1;
   if (startingDayOfWeek === -1) startingDayOfWeek = 6;
 
   const daysInMonth = lastDayOfMonth.getDate();
   const prevMonthLastDay = new Date(year, month, 0).getDate();
 
-  const days = [];
+  const days: MonthDay[] = [];
 
-  // Previous month trailing days
   for (let i = startingDayOfWeek - 1; i >= 0; i--) {
     days.push({
       date: new Date(year, month - 1, prevMonthLastDay - i),
@@ -71,7 +74,6 @@ export function getMonthMatrix(year, month) {
     });
   }
 
-  // Current month days
   for (let i = 1; i <= daysInMonth; i++) {
     days.push({
       date: new Date(year, month, i),
@@ -79,7 +81,6 @@ export function getMonthMatrix(year, month) {
     });
   }
 
-  // Next month leading days to complete the 35 or 42 grid
   const remaining = 42 - days.length;
   for (let i = 1; i <= remaining; i++) {
     days.push({
