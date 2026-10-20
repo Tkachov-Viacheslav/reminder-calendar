@@ -15,8 +15,16 @@ export function initSentry(): void {
   try {
     Sentry.init({
       dsn,
-      integrations: [Sentry.browserTracingIntegration()],
-      tracesSampleRate: 0.2,
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration({
+          maskAllText: false,
+          blockAllMedia: false,
+        }),
+      ],
+      tracesSampleRate: 0.3,
+      replaysSessionSampleRate: 0.1,
+      replaysOnErrorSampleRate: 1.0,
       environment: import.meta.env.MODE || 'production',
     });
   } catch (err) {

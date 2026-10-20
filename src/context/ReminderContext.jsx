@@ -8,6 +8,7 @@ import { useRemindersRealtime } from '../hooks/useRemindersRealtime';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import { LOCAL_STORAGE_KEY } from '../utils/constants';
 import { getStorageItem, setStorageItem } from '../services/dbStorage';
+import { trackUserAction } from '../services/analytics';
 
 const ReminderContext = createContext(null);
 
@@ -233,6 +234,11 @@ export function ReminderProvider({ children }) {
         !isOnline ? 'Збережено офлайн (синхронізується в мережі)' : 'Нагадування створено',
         !isOnline ? 'info' : 'success'
       );
+      trackUserAction('reminder_created', {
+        is_team: Boolean(activeTeamId),
+        category: newReminder.category || 'main',
+        is_offline: !isOnline,
+      });
       return newReminder;
     },
     [activeUserId, activeTeamId, user, storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
@@ -270,6 +276,11 @@ export function ReminderProvider({ children }) {
       } else {
         showToast('Зміни збережено', 'success');
       }
+
+      trackUserAction('reminder_updated', {
+        is_team: Boolean(activeTeamId),
+        is_completed: updates.is_sent === true,
+      });
     },
     [storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
   );
@@ -306,6 +317,7 @@ export function ReminderProvider({ children }) {
         if (!deletedRemotely && isSupabaseConfigured()) {
           enqueueMutation('delete', { id });
         }
+        trackUserAction('reminder_deleted', { is_team: Boolean(activeTeamId) });
       };
 
       // Даємо 5 секунд на скасування видалення (Undo)

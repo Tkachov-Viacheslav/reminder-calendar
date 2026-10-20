@@ -19,6 +19,7 @@ import {
   getStoredGeminiApiKey,
   setStoredGeminiApiKey,
 } from '../../services/aiService';
+import { trackUserAction } from '../../services/analytics';
 import { getCategoryMeta } from '../../utils/constants';
 
 const BASE_QUICK_CHIPS = [
@@ -156,6 +157,7 @@ export function AiPlannerModal({
         if (list.length > 0) {
           setGeneratedReminders(list);
           setAiMessage(result.message || '');
+          trackUserAction('ai_planner_generated', { count: list.length });
         } else {
           setErrorMsg('ШІ не зміг сформувати жодної події.');
         }
@@ -230,6 +232,7 @@ export function AiPlannerModal({
     });
 
     onApplyReminder(formattedList);
+    trackUserAction('ai_planner_plan_applied', { count: formattedList.length });
     onClose();
   };
 

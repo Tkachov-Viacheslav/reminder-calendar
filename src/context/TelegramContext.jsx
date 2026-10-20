@@ -16,6 +16,7 @@ import {
   verifyTelegramAuthWithApi,
   healTelegramUserId,
 } from '../services/authService';
+import { setAnalyticsUser, trackUserAction } from '../services/analytics';
 import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 const TelegramContext = createContext(null);
@@ -37,6 +38,7 @@ export function TelegramProvider({ children }) {
         saveStoredUser(result.user);
         setHasSession(true);
         triggerHaptic('success');
+        trackUserAction('auth_success', { method: 'telegram_widget' });
         return result;
       }
 
@@ -62,6 +64,7 @@ export function TelegramProvider({ children }) {
         saveStoredUser(result.user);
         setHasSession(true);
         triggerHaptic('success');
+        trackUserAction('auth_success', { method: 'code' });
         return result;
       }
       triggerHaptic('error');
@@ -113,14 +116,18 @@ export function TelegramProvider({ children }) {
 
   // 2. Heal user ID if it is a long temporary ID
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setAnalyticsUser(null);
+      return;
+    }
+    setAnalyticsUser(user, isInTelegram ? 'telegram_tma' : 'desktop_browser');
     healTelegramUserId(user).then((healed) => {
       if (healed) {
         setUser(healed);
         saveStoredUser(healed);
       }
     });
-  }, [user]);
+  }, [user, isInTelegram]);
 
   // 3. Синхронізація сесії Supabase Auth
   useEffect(() => {

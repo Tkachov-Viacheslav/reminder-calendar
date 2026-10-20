@@ -4,6 +4,7 @@ import { useTelegram } from './TelegramContext';
 import { useToast } from './ToastContext';
 import { useTeamTopics } from '../hooks/useTeamTopics';
 import { LOCAL_STORAGE_ACTIVE_TEAM } from '../utils/constants';
+import { trackUserAction } from '../services/analytics';
 
 const TeamContext = createContext(null);
 
@@ -282,6 +283,10 @@ export function TeamProvider({ children }) {
       } else {
         localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
       }
+      trackUserAction('workspace_switched', {
+        is_team: Boolean(teamId),
+        workspace: teamId ? 'team' : 'personal',
+      });
     },
     [triggerHaptic]
   );
