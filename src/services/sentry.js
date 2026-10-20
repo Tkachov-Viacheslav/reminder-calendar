@@ -4,6 +4,7 @@ export function initSentry() {
   const dsn =
     import.meta.env.VITE_SENTRY_DSN ||
     import.meta.env.SENTRY_DSN ||
+    import.meta.env.NEXT_PUBLIC_SENTRY_DSN ||
     '';
 
   if (!dsn) return;

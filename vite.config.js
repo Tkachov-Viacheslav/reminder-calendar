@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
     },
+    envPrefix: ['VITE_', 'SENTRY_', 'NEXT_PUBLIC_'],
     build: {
       rollupOptions: {
         output: {
