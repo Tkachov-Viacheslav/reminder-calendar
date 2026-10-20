@@ -19,13 +19,6 @@ export function initSentry(): void {
       tracesSampleRate: 0.2,
       environment: import.meta.env.MODE || 'production',
     });
-
-    // Emit initial verification metrics requested by Sentry setup
-    if (Sentry.metrics) {
-      Sentry.metrics.count('button_click', 1);
-      Sentry.metrics.gauge('page_load_time', 150);
-      Sentry.metrics.distribution('response_time', 200);
-    }
   } catch (err) {
     console.warn('Failed to initialize Sentry:', err);
   }
