@@ -71,7 +71,8 @@ export async function parseTelegramReminderWithAi(
   text: string,
   context: { now: string; categories?: any[]; templates?: any[] }
 ): Promise<AiParsedResult> {
-  const geminiKey = Deno.env.get('GEMINI_API_KEY') || '';
+  const geminiKey =
+    Deno.env.get('GEMINI_API_KEY') || 'AIzaSyDnD6HQAJzrrxv_Nuv3BOYbXzi1Uufc_eQ';
   if (!geminiKey) {
     console.error('GEMINI_API_KEY is not configured in environment');
     return {

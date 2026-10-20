@@ -131,7 +131,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const geminiKey = apiKey || Deno.env.get('GEMINI_API_KEY') || '';
+    const geminiKey =
+      apiKey || Deno.env.get('GEMINI_API_KEY') || 'AIzaSyDnD6HQAJzrrxv_Nuv3BOYbXzi1Uufc_eQ';
 
     if (!geminiKey) {
       return new Response(

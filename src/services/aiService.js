@@ -8,7 +8,7 @@ export function getStoredGeminiApiKey() {
     const fromStorage = localStorage.getItem(LOCAL_STORAGE_GEMINI_API_KEY);
     if (fromStorage && fromStorage.trim()) return fromStorage.trim();
   } catch {}
-  return import.meta.env.VITE_GEMINI_API_KEY || '';
+  return '';
 }
 
 export function setStoredGeminiApiKey(key) {

@@ -39,7 +39,23 @@ export async function handleBindCommand(
     return;
   }
 
-  const cleanCategory = categoryRaw.toLowerCase().replace('#', '');
+  const cleanCategory = categoryRaw
+    .toLowerCase()
+    .replace('#', '')
+    .replace(/[^\p{L}\p{N}_-]/gu, '')
+    .slice(0, 50);
+
+  if (!cleanCategory) {
+    await sendGroupMessage(
+      botToken,
+      chatId,
+      '⚠️ Некоректна назва категорії. Вкажіть, наприклад: <code>/bind робота</code>',
+      threadId,
+      [],
+      incomingMessageId
+    );
+    return;
+  }
   await supabase.from('team_category_topics').upsert(
     {
       team_id: teamId,

@@ -108,7 +108,18 @@ export async function handleAddMemberCommand(
     return;
   }
 
-  const clean = rawUsername.replace(/^@/, '');
+  const clean = rawUsername.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g, '');
+  if (!clean || clean.length > 32) {
+    await sendGroupMessage(
+      botToken,
+      chatId,
+      '⚠️ Некоректний username. Вкажіть дійсний Telegram username, наприклад <code>/addmember @username</code>',
+      threadId,
+      [],
+      incomingMessageId
+    );
+    return;
+  }
   const placeholderId = `@${clean.toLowerCase()}`;
 
   const { data: existing } = await supabase

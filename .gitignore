@@ -28,3 +28,8 @@ package-lock.json
 *.njsproj
 *.sln
 *.sw?
+
+# Security & test scripts
+scripts/test-security.mjs
+scripts/test-*.mjs
+
