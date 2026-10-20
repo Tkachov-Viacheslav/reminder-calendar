@@ -24,6 +24,9 @@ export function clearStoredAuth() {
   try {
     localStorage.removeItem(LOCAL_STORAGE_USER);
     localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
+    if (supabase?.auth) {
+      supabase.auth.signOut().catch(() => {});
+    }
   } catch {}
 }
 
@@ -61,12 +64,56 @@ export async function verifyAuthCodeWithApi(code) {
   const data = await res.json();
 
   if (res.ok && data.ok && data.user) {
+    if (data.session && supabase?.auth) {
+      try {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      } catch (e) {
+        console.warn('Failed to set Supabase auth session:', e);
+      }
+    }
     const u = data.user;
     const photoUrl = u.photo_url || (u.username ? `https://t.me/i/userpic/320/${u.username}.jpg` : '');
     return { success: true, user: { ...u, photo_url: photoUrl } };
   }
 
   return { success: false, error: data?.error || 'Невірний код' };
+}
+
+export async function verifyInitDataWithApi(initData) {
+  if (!initData) return { success: false };
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dwzswscabsphwprptnos.supabase.co';
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (anonKey) {
+    headers['apikey'] = anonKey;
+    headers['Authorization'] = `Bearer ${anonKey}`;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/verify-code`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ initData }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok && data.user) {
+      if (data.session && supabase?.auth) {
+        try {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+        } catch (e) {
+          console.warn('Failed to set Supabase auth session from initData:', e);
+        }
+      }
+      return { success: true, user: data.user };
+    }
+  } catch {}
+  return { success: false };
 }
 
 export async function healTelegramUserId(user) {

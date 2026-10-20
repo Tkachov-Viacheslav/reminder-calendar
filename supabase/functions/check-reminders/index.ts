@@ -70,7 +70,7 @@ async function cleanupEphemeralMessages(supabase: any, botToken: string) {
 
 Deno.serve(async (req: Request) => {
   const secretHeader = req.headers.get('x-cron-secret');
-  if (CRON_SECRET && secretHeader !== CRON_SECRET) {
+  if (!CRON_SECRET || secretHeader !== CRON_SECRET) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

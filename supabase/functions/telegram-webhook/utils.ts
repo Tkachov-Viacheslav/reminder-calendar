@@ -29,8 +29,18 @@ export function getNowInKyiv() {
 }
 
 export function kyivToUtc(year: number, month: number, day: number, hour: number, minute: number): Date {
-  const isoStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00Z`;
+  const safeYear = Number.isInteger(year) ? year : new Date().getFullYear();
+  const safeMonth = Number.isInteger(month) && month >= 1 && month <= 12 ? month : 1;
+  const safeDay = Number.isInteger(day) && day >= 1 && day <= 31 ? day : 1;
+  const safeHour = Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 10;
+  const safeMinute = Number.isInteger(minute) && minute >= 0 && minute <= 59 ? minute : 0;
+
+  const isoStr = `${safeYear}-${String(safeMonth).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}T${String(safeHour).padStart(2, '0')}:${String(safeMinute).padStart(2, '0')}:00Z`;
   const targetLocalTime = new Date(isoStr).getTime();
+  if (isNaN(targetLocalTime)) {
+    return new Date();
+  }
+
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Europe/Kyiv',
     year: 'numeric',

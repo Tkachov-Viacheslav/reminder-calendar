@@ -88,6 +88,49 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    if (text.length > 2000) {
+      return new Response(
+        JSON.stringify({
+          error: 'PROMPT_TOO_LONG',
+          message: 'Запит занадто довгий (максимум 2000 символів)',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
+      );
+    }
+
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('cf-connecting-ip') ||
+      'anonymous';
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://dwzswscabsphwprptnos.supabase.co';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const { data: rateCheck } = await supabase.rpc('check_and_register_ai_rate_limit', {
+      p_ip: clientIp,
+    });
+
+    if (rateCheck && rateCheck.allowed === false) {
+      return new Response(
+        JSON.stringify({
+          error: 'RATE_LIMIT_EXCEEDED',
+          message: `Забагато запитів до ШІ. Зачекайте ${rateCheck.retry_after} сек.`,
+        }),
+        {
+          status: 429,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateCheck.retry_after),
+          },
+        }
+      );
+    }
+
     const geminiKey = apiKey || Deno.env.get('GEMINI_API_KEY') || '';
 
     if (!geminiKey) {

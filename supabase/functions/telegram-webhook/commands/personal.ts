@@ -243,7 +243,10 @@ export async function handleAiReminderMessage(
         const [hour, minute] = r.timeStr.split(':').map(Number);
         const eventUtc = kyivToUtc(year, month, day, hour, minute);
         const remindBeforeMs = (r.remindBefore || 0) * 60 * 1000;
-        const remindAtUtc = new Date(eventUtc.getTime() - remindBeforeMs);
+        let remindAtUtc = new Date(eventUtc.getTime() - remindBeforeMs);
+        if (isNaN(remindAtUtc.getTime())) {
+          remindAtUtc = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        }
 
         const formattedItems = (r.items || []).map((itText, idx) => ({
           id: `it-${Date.now()}-${idx}`,

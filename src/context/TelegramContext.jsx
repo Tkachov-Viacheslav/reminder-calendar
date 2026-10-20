@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import {
   initTelegramWebApp,
+  getTelegramInitData,
   triggerHaptic,
   setClosingConfirmation,
   setupBackButton,
@@ -11,6 +12,7 @@ import {
   clearStoredAuth,
   formatTelegramUser,
   verifyAuthCodeWithApi,
+  verifyInitDataWithApi,
   healTelegramUserId,
 } from '../services/authService';
 
@@ -63,6 +65,17 @@ export function TelegramProvider({ children }) {
       setIsInTelegram(true);
       setUser(tmaUser);
       saveStoredUser(tmaUser);
+
+      // Безпечна криптографічна валідація initData на бекенді
+      const rawInitData = getTelegramInitData();
+      if (rawInitData) {
+        verifyInitDataWithApi(rawInitData).then((res) => {
+          if (res.success && res.user) {
+            setUser(res.user);
+            saveStoredUser(res.user);
+          }
+        });
+      }
       return;
     }
 

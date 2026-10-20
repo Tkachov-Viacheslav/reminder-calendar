@@ -82,6 +82,11 @@ export function initTelegramWebApp() {
   };
 }
 
+export function getTelegramInitData() {
+  const tg = getTelegramWebApp();
+  return tg?.initData || '';
+}
+
 export function triggerHaptic(type = 'light') {
   try {
     const tg = getTelegramWebApp();

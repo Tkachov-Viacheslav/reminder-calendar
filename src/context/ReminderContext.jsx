@@ -225,7 +225,7 @@ export function ReminderProvider({ children }) {
         const updated = [...prev, newReminder].sort(
           (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
         );
-        localStorage.setItem(storageKey, JSON.stringify(updated));
+        setStorageItem(storageKey, updated);
         return updated;
       });
 
@@ -259,7 +259,7 @@ export function ReminderProvider({ children }) {
 
       setReminders((prev) => {
         const updated = prev.map((r) => (r.id === id ? { ...r, ...updates } : r));
-        localStorage.setItem(storageKey, JSON.stringify(updated));
+        setStorageItem(storageKey, updated);
         return updated;
       });
 
@@ -283,7 +283,7 @@ export function ReminderProvider({ children }) {
       // Оптимістично видаляємо з локального стану
       setReminders((prev) => {
         const updated = prev.filter((r) => r.id !== id);
-        localStorage.setItem(storageKey, JSON.stringify(updated));
+        setStorageItem(storageKey, updated);
         return updated;
       });
 
@@ -328,7 +328,7 @@ export function ReminderProvider({ children }) {
               const restored = [...prev, targetReminder].sort(
                 (a, b) => new Date(a.remind_at) - new Date(b.remind_at)
               );
-              localStorage.setItem(storageKey, JSON.stringify(restored));
+              setStorageItem(storageKey, restored);
               return restored;
             });
             showToast('Нагадування відновлено', 'success');
@@ -347,7 +347,7 @@ export function ReminderProvider({ children }) {
 
       setReminders((prev) => {
         const updated = prev.filter((r) => !idsSet.has(r.id));
-        localStorage.setItem(storageKey, JSON.stringify(updated));
+        setStorageItem(storageKey, updated);
         return updated;
       });
 
