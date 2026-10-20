@@ -12,6 +12,7 @@ import { Info, Users, WifiOff, RefreshCw } from 'lucide-react';
 import { Card, Badge } from './components/ui';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './context/ToastContext';
+import { useAppBadge } from './hooks/useAppBadge';
 
 // Lazy load modals to reduce initial memory footprint and bundle execution
 const ReminderModal = lazy(() =>
@@ -47,6 +48,9 @@ function CalendarContent() {
   const { activeUserId } = useTelegram();
   const { templates } = useReminderTemplates(currentTeam?.id, activeUserId);
 
+  // Synchronize native PWA App Badge with today's pending reminders
+  useAppBadge(reminders);
+
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -61,27 +65,31 @@ function CalendarContent() {
 
   const handleApplyAiReminder = async (data) => {
     try {
-      const [year, month, day] = data.dateStr.split('-').map(Number);
-      const [hours, minutes] = data.timeStr.split(':').map(Number);
-      const eventDate = new Date(year, month - 1, day, hours, minutes);
-      const remindAtDate = new Date(eventDate.getTime() - (data.remindBefore || 0) * 60 * 1000);
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        if (!item || !item.dateStr || !item.timeStr) continue;
+        const [year, month, day] = item.dateStr.split('-').map(Number);
+        const [hours, minutes] = item.timeStr.split(':').map(Number);
+        const eventDate = new Date(year, month - 1, day, hours, minutes);
+        const remindAtDate = new Date(eventDate.getTime() - (item.remindBefore || 0) * 60 * 1000);
 
-      let topicThreadId = null;
-      if (currentTeam?.id && categoryTopics?.[data.category]) {
-        topicThreadId = categoryTopics[data.category];
+        let topicThreadId = null;
+        if (currentTeam?.id && categoryTopics?.[item.category]) {
+          topicThreadId = categoryTopics[item.category];
+        }
+
+        await addReminder({
+          title: item.title,
+          date: eventDate.toISOString(),
+          remind_at: remindAtDate.toISOString(),
+          category: item.category || 'main',
+          repeat_type: item.repeatType || 'none',
+          remind_before: item.remindBefore || 0,
+          thread_id: topicThreadId,
+          tagged_members: item.taggedMembers || [],
+          items: item.items || [],
+        });
       }
-
-      await addReminder({
-        title: data.title,
-        date: eventDate.toISOString(),
-        remind_at: remindAtDate.toISOString(),
-        category: data.category || 'main',
-        repeat_type: data.repeatType || 'none',
-        remind_before: data.remindBefore || 0,
-        thread_id: topicThreadId,
-        tagged_members: data.taggedMembers || [],
-        items: data.items || [],
-      });
     } catch (err) {
       console.error('Failed to apply AI reminder:', err);
     }

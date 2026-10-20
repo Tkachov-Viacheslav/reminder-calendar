@@ -1,16 +1,17 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const GEMINI_SYSTEM_INSTRUCTION = `Ти — інтелектуальний планувальник нагадувань та подій у календарі.
-Твоє завдання — проаналізувати поле userInput із наданого JSON та створити нагадування.
+Твоє завдання — проаналізувати поле userInput із наданого JSON та створити ОДНЕ АБО ДЕКІЛЬКА нагадувань.
 
 ПРАВИЛА РОЗПІЗНАВАННЯ:
-1. Якщо userInput містить намір створити, запланувати або нагадати про подію чи завдання (наприклад: "зустріч", "нагадай", "купити", "дедлайн", "зателефонувати", дата, час або назва шаблону) — встанови status="SUCCESS", заповни message ("Нагадування сформовано") та створи об'єкт reminder.
-2. Встановлюй status="OUT_OF_SCOPE" ТІЛЬКИ якщо повідомлення є абсолютно стороннім (наприклад: "яка погода", "хто президент", "розкажи анекдот", "привіт як справи", філософські бесіди).
-3. ДАТА ТА ЧАС: Обчисли точну дату (YYYY-MM-DD) та час (HH:MM) на основі поля currentDateTime. Якщо дата відносна ("завтра", "післязавтра", "у п'ятницю") — визнач відповідну календарну дату від дати в currentDateTime. Якщо час не вказано — за замовчуванням 10:00.
-4. УЧАСНИКИ: Якщо в тексті є згадка людини за ім'ям або ніком ("Слава", "Марія", "@username"), знайди її у списку teamMembers та додай telegram_id у taggedMemberIds.
-5. ШАБЛОНИ: Якщо користувач згадує назву з availableTemplates ("за шаблоном Звіт"), вкажи matchedTemplateId, підстав категорію та підзавдання шаблону.
-6. ПІДЗАВДАННЯ: Якщо користувач називає перелік справ/пунктів — розбий їх на масив items.
-7. Мова завжди українська.`;
+1. КІЛЬКА НАГАДУВАНЬ: Якщо користувач перелічує кілька справ, подій чи пунктів розкладу (наприклад: "о 10:00 зустріч, о 14:00 обід, а в п'ятницю звіт") — створи окремий об'єкт для КОЖНОЇ події у масиві reminders. Якщо вказано одну подію — поверни масив reminders з 1 елементом.
+2. Встановлюй status="SUCCESS", якщо розпізнано хоча б одну подію/завдання, та заповни message ("Сформовано X нагадувань").
+3. Встановлюй status="OUT_OF_SCOPE" ТІЛЬКИ якщо повідомлення є абсолютно стороннім (наприклад: "яка погода", "хто президент", "розкажи анекдот", "привіт як справи", філософські бесіди).
+4. ДАТА ТА ЧАС: Обчисли точну дату (YYYY-MM-DD) та час (HH:MM) для кожної події на основі currentDateTime. Якщо дата відносна ("завтра", "у середу") — визнач відповідну календарну дату від currentDateTime. Якщо час не вказано — за замовчуванням 10:00.
+5. УЧАСНИКИ: Якщо для події згадано людину за ім'ям або ніком ("Слава", "Марія", "@username"), знайди її у списку teamMembers та додай telegram_id у taggedMemberIds.
+6. ШАБЛОНИ: Якщо користувач згадує назву з availableTemplates ("за шаблоном Звіт"), вкажи matchedTemplateId, підстав категорію та підзавдання шаблону.
+7. ПІДЗАВДАННЯ: Якщо користувач називає перелік дій/пунктів для події — розбий їх на масив items.
+8. Мова завжди українська.`;
 
 const RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -24,50 +25,57 @@ const RESPONSE_SCHEMA = {
       type: "STRING",
       description: "Коротке пояснення для користувача українською мовою."
     },
-    reminder: {
-      type: "OBJECT",
-      properties: {
-        title: { type: "STRING", description: "Назва нагадування" },
-        dateStr: { type: "STRING", description: "Дата у форматі YYYY-MM-DD" },
-        timeStr: { type: "STRING", description: "Час у форматі HH:MM" },
-        category: { type: "STRING", description: "Категорія" },
-        remindBefore: { type: "INTEGER", description: "За скільки хвилин нагадати (0, 15, 30, 60)" },
-        repeatType: {
-          type: "STRING",
-          enum: ["none", "daily", "weekdays", "weekly", "monthly"],
-          description: "Тип повторення"
+    reminders: {
+      type: "ARRAY",
+      description: "Список сформованих нагадувань (одне або декілька)",
+      items: {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING", description: "Назва нагадування" },
+          dateStr: { type: "STRING", description: "Дата у форматі YYYY-MM-DD" },
+          timeStr: { type: "STRING", description: "Час у форматі HH:MM" },
+          category: { type: "STRING", description: "Категорія" },
+          remindBefore: { type: "INTEGER", description: "За скільки хвилин нагадати (0, 15, 30, 60)" },
+          repeatType: {
+            type: "STRING",
+            enum: ["none", "daily", "weekdays", "weekly", "monthly"],
+            description: "Тип повторення"
+          },
+          items: {
+            type: "ARRAY",
+            items: { type: "STRING" },
+            description: "Список пунктів чекліста / підзавдань"
+          },
+          matchedTemplateId: { type: "STRING", description: "ID обраного шаблону (якщо є)" },
+          taggedMemberIds: {
+            type: "ARRAY",
+            items: { type: "STRING" },
+            description: "Telegram ID учасників, яких треба тегнути"
+          }
         },
-        items: {
-          type: "ARRAY",
-          items: { type: "STRING" },
-          description: "Список пунктів чекліста / підзавдань"
-        },
-        matchedTemplateId: { type: "STRING", description: "ID обраного шаблону (якщо є)" },
-        taggedMemberIds: {
-          type: "ARRAY",
-          items: { type: "STRING" },
-          description: "Telegram ID учасників, яких треба тегнути"
-        }
-      },
-      required: ["title", "dateStr", "timeStr"]
+        required: ["title", "dateStr", "timeStr"]
+      }
     }
   },
   required: ["status", "message"]
 };
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
-    });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 
   try {
@@ -76,18 +84,22 @@ Deno.serve(async (req: Request) => {
     if (!text || !text.trim()) {
       return new Response(JSON.stringify({ error: 'Text prompt is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
-    const geminiKey = apiKey || Deno.env.get('GEMINI_API_KEY');
+    const geminiKey = apiKey || Deno.env.get('GEMINI_API_KEY') || '';
+
     if (!geminiKey) {
       return new Response(
         JSON.stringify({
           error: 'GEMINI_API_KEY_REQUIRED',
           message: 'Будь ласка, вкажіть Gemini API Key у налаштуваннях або в секретах Supabase.',
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        }
       );
     }
 
@@ -147,7 +159,7 @@ Deno.serve(async (req: Request) => {
           status: geminiRes.status,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
+            ...corsHeaders,
           },
         }
       );
@@ -162,6 +174,15 @@ Deno.serve(async (req: Request) => {
     let parsed = null;
     try {
       parsed = rawOutput ? JSON.parse(rawOutput) : null;
+      if (parsed) {
+        if (Array.isArray(parsed.reminders)) {
+          parsed.reminder = parsed.reminders[0] || null;
+        } else if (parsed.reminder) {
+          parsed.reminders = [parsed.reminder];
+        } else {
+          parsed.reminders = [];
+        }
+      }
     } catch (parseErr) {
       console.error('JSON parse error from Gemini:', rawOutput, parseErr);
     }
@@ -170,7 +191,7 @@ Deno.serve(async (req: Request) => {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
       },
     });
   } catch (err: any) {
@@ -179,7 +200,7 @@ Deno.serve(async (req: Request) => {
       status: 500,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        ...corsHeaders,
       },
     });
   }

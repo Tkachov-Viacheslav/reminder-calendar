@@ -91,6 +91,20 @@ export function triggerHaptic(type = 'light') {
       } else {
         tg.HapticFeedback.impactOccurred(type);
       }
+      return;
+    }
+
+    // Native Web Vibration API fallback for standalone PWA / mobile browsers
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      if (type === 'success') {
+        navigator.vibrate([15, 35, 15]);
+      } else if (type === 'error') {
+        navigator.vibrate([30, 50, 30]);
+      } else if (type === 'medium') {
+        navigator.vibrate(20);
+      } else {
+        navigator.vibrate(10);
+      }
     }
   } catch {
     // Haptic feedback not supported on this device/version

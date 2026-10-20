@@ -14,7 +14,9 @@ export function useRemindersRealtime({ activeTeamId, activeUserId, onInsert, onU
         (payload) => {
           const { eventType, new: newRec, old: oldRec } = payload;
           const isCurrentScope = activeTeamId
-            ? newRec?.team_id === activeTeamId || oldRec?.team_id === activeTeamId
+            ? newRec?.team_id === activeTeamId ||
+              oldRec?.team_id === activeTeamId ||
+              (eventType === 'DELETE' && !oldRec?.team_id)
             : (!newRec?.team_id && (!activeUserId || newRec?.user_id === activeUserId)) ||
               (!oldRec?.team_id && (!activeUserId || oldRec?.user_id === activeUserId));
 

@@ -1,6 +1,7 @@
-import { escapeHtml, getKyivDayRange } from '../utils.ts';
+import { escapeHtml, getKyivDayRange, kyivToUtc, getNowInKyiv, tryParseQuickReminder } from '../utils.ts';
 import { sendBotMessage, getBotChatStatus } from '../telegram.ts';
 import { getSupabaseClient } from '../db.ts';
+import { parseTelegramReminderWithAi } from '../ai.ts';
 import {
   getUserTeamsWithRoles,
   formatTeamStatusItem,
@@ -16,17 +17,17 @@ export async function sendWelcome(
   const name = escapeHtml(user?.first_name || 'друже');
   const replyText =
     `👋 <b>Вітаю, ${name}!</b>\n\n` +
-    `Я бот для нагадувань у Календарі.\n\n` +
+    `Я розумний бот для нагадувань у Календарі на базі ШІ.\n\n` +
     `⚡ <b>Корисні команди:</b>\n` +
     `• /today — розклад на сьогодні\n` +
     `• /tomorrow — плани на завтра\n` +
     `• /week — справи на 7 днів\n` +
     `• /groups — мої групи та статус бота\n` +
     `• /code — код для входу в браузері\n\n` +
-    `✍️ <b>Швидке створення:</b> напишіть мені в чат:\n` +
-    `• <i>«10.11 19:00 Сходити в ДНУ»</i>\n` +
-    `• <i>«Завтра о 14:30 дзвінок»</i>\n` +
-    `• <i>«Купити молоко о 20:00»</i>`;
+    `🤖 <b>ШІ-створення:</b> просто напишіть мені звичайною мовою:\n` +
+    `• <i>«Завтра о 15:30 зустріч із партнером»</i>\n` +
+    `• <i>«У середу о 19:00 тренування, нагадай за 30 хв»</i>\n` +
+    `• <i>«О 10:00 планірка, а в п'ятницю о 18:00 звіт»</i>`;
 
   await sendBotMessage(botToken, chatId, replyText, siteUrl, [
     [{ text: '🔑 Отримати код для браузера', callback_data: 'get_code' }],
@@ -46,9 +47,9 @@ export async function sendHelp(
     `📆 <b>/week</b> — розклад на найближчі 7 днів\n` +
     `👥 <b>/groups</b> — перевірити підключені групи та статус прав бота\n` +
     `🔑 <b>/code</b> — отримати одноразовий код авторизації для ПК\n\n` +
-    `⏰ <b>Створення:</b> просто пишіть текст із датою та часом:\n` +
-    `• <i>Сьогодні о 19:00 тренування</i>\n` +
-    `• <i>15.11 12:00 стоматолог</i>\n\n` +
+    `🤖 <b>ШІ-створення справ:</b> пишіть у чат вільним текстом або перелічуйте декілька справ:\n` +
+    `• <i>«Завтра о 14:00 зум з клієнтом»</i>\n` +
+    `• <i>«Сьогодні о 20:00 купити молоко і хліб»</i>\n\n` +
     `☀️ <b>Ранковий дайджест:</b> щоранку о 09:00 бот надсилає зведення завдань.`;
 
   await sendBotMessage(botToken, chatId, replyText, siteUrl, [
@@ -199,6 +200,123 @@ export async function handleQuickReminder(
     `⏰ Час: <b>${timeFormatted}</b>`;
 
   await sendBotMessage(botToken, chatId, replyText, siteUrl);
+}
+
+export async function handleAiReminderMessage(
+  chatId: string | number,
+  text: string,
+  user: any,
+  botToken: string,
+  siteUrl: string
+) {
+  const supabase = getSupabaseClient();
+  const now = getNowInKyiv();
+  const nowStr = `${now.year}-${String(now.month).padStart(2, '0')}-${String(now.day).padStart(2, '0')} ${String(now.hour).padStart(2, '0')}:${String(now.minute).padStart(2, '0')}`;
+
+  try {
+    const aiResult = await parseTelegramReminderWithAi(text, {
+      now: `${nowStr} (Kyiv Time, ISO: ${new Date().toISOString()})`,
+    });
+
+    if (aiResult.status === 'OUT_OF_SCOPE') {
+      const reply =
+        `🤖 <b>ШІ-планувальник розкладу</b>\n\n` +
+        `${escapeHtml(aiResult.message || 'Я фокусуюся лише на плануванні завдань.')}\n\n` +
+        `💡 <i>Напишіть звичайною мовою, що і на коли запланувати:</i>\n` +
+        `• <i>«Завтра о 15:30 зустріч із партнером»</i>\n` +
+        `• <i>«У середу о 19:00 тренування, нагадай за 30 хв»</i>\n` +
+        `• <i>«Сьогодні о 20:00 купити молоко і хліб»</i>`;
+      await sendBotMessage(botToken, chatId, reply, siteUrl);
+      return;
+    }
+
+    if (
+      aiResult.status === 'SUCCESS' &&
+      Array.isArray(aiResult.reminders) &&
+      aiResult.reminders.length > 0
+    ) {
+      const createdList: any[] = [];
+
+      for (let i = 0; i < aiResult.reminders.length; i++) {
+        const r = aiResult.reminders[i];
+        const [year, month, day] = r.dateStr.split('-').map(Number);
+        const [hour, minute] = r.timeStr.split(':').map(Number);
+        const eventUtc = kyivToUtc(year, month, day, hour, minute);
+        const remindBeforeMs = (r.remindBefore || 0) * 60 * 1000;
+        const remindAtUtc = new Date(eventUtc.getTime() - remindBeforeMs);
+
+        const formattedItems = (r.items || []).map((itText, idx) => ({
+          id: `it-${Date.now()}-${idx}`,
+          text: String(itText),
+          done: false,
+        }));
+
+        const newReminder = {
+          id: `rem-${Date.now()}-${i}`,
+          user_id: String(chatId),
+          title: r.title,
+          category: r.category || 'main',
+          remind_at: remindAtUtc.toISOString(),
+          remind_before: r.remindBefore || 0,
+          repeat_type: r.repeatType || 'none',
+          items: formattedItems,
+          is_sent: false,
+          created_at: new Date().toISOString(),
+        };
+
+        const { error: insertError } = await supabase.from('reminders').insert([newReminder]);
+        if (insertError) {
+          console.error('Failed to insert AI reminder:', insertError);
+          continue;
+        }
+        createdList.push({ ...newReminder, dateStr: r.dateStr, timeStr: r.timeStr });
+      }
+
+      if (createdList.length === 1) {
+        const single = createdList[0];
+        const checklistLines = (single.items || []).map(
+          (it: any) => `  ▫️ ${escapeHtml(it.text)}`
+        );
+        const checklistBlock =
+          checklistLines.length > 0 ? `\n📋 <b>Підзавдання:</b>\n${checklistLines.join('\n')}` : '';
+
+        const reply =
+          `✨ <b>Нагадування заплановано через ШІ!</b>\n\n` +
+          `📌 <b>${escapeHtml(single.title)}</b>\n` +
+          `📅 Дата: <b>${single.dateStr}</b>\n` +
+          `⏰ Час: <b>${single.timeStr}</b>` +
+          checklistBlock;
+
+        const cancelBtn = [{ text: '❌ Скасувати', callback_data: `cancel_${single.id}` }];
+        await sendBotMessage(botToken, chatId, reply, siteUrl, [cancelBtn]);
+      } else {
+        const itemsText = createdList
+          .map(
+            (r, idx) =>
+              `${idx + 1}️⃣ <b>${escapeHtml(r.title)}</b> — <i>${r.dateStr} о ${r.timeStr}</i>`
+          )
+          .join('\n');
+
+        const reply =
+          `✨ <b>ШІ запланував ${createdList.length} нагадувань:</b>\n\n` +
+          itemsText +
+          `\n\n💡 <i>Усі завдання вже збережено у вашому календарі.</i>`;
+
+        await sendBotMessage(botToken, chatId, reply, siteUrl);
+      }
+      return;
+    }
+  } catch (err) {
+    console.warn('AI parsing failed in Telegram bot, falling back:', err);
+  }
+
+  // Fallback to legacy parser if AI failed
+  const fallback = tryParseQuickReminder(text);
+  if (fallback) {
+    await handleQuickReminder(chatId, fallback, botToken, siteUrl);
+  } else {
+    await sendWelcome(chatId, user, botToken, siteUrl);
+  }
 }
 
 export async function handleUserGroupsCommand(

@@ -9,6 +9,7 @@ export {
   handleTomorrowCommand,
   handleWeekCommand,
   handleQuickReminder,
+  handleAiReminderMessage,
   handleUserGroupsCommand,
 } from './commands/personal.ts';
 

@@ -141,6 +141,24 @@ export function ReminderProvider({ children }) {
     onSyncSuccess: fetchReminders,
   });
 
+  const pendingDeletesRef = useRef(new Map());
+
+  // Запобігання втраті відкладених видалень при закритті вкладки або переході
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      pendingDeletesRef.current.forEach(({ timeoutId, executeDelete }) => {
+        clearTimeout(timeoutId);
+        executeDelete();
+      });
+      pendingDeletesRef.current.clear();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      handleBeforeUnload();
+    };
+  }, []);
+
   // Modern App Badging API: update home screen badge count
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('setAppBadge' in navigator)) return;
@@ -273,6 +291,7 @@ export function ReminderProvider({ children }) {
       let deleteTimeoutId = null;
 
       const executeDelete = async () => {
+        pendingDeletesRef.current.delete(id);
         if (wasCancelled) return;
         let deletedRemotely = false;
         if (isOnline && isSupabaseConfigured() && supabase) {
@@ -291,6 +310,7 @@ export function ReminderProvider({ children }) {
 
       // Даємо 5 секунд на скасування видалення (Undo)
       deleteTimeoutId = setTimeout(executeDelete, 5000);
+      pendingDeletesRef.current.set(id, { timeoutId: deleteTimeoutId, executeDelete });
 
       showToast(
         `Нагадування «${targetReminder.title}» видалено`,
@@ -301,6 +321,7 @@ export function ReminderProvider({ children }) {
           onClick: () => {
             wasCancelled = true;
             clearTimeout(deleteTimeoutId);
+            pendingDeletesRef.current.delete(id);
             triggerHaptic('success');
             setReminders((prev) => {
               if (prev.some((r) => r.id === id)) return prev;
@@ -330,17 +351,23 @@ export function ReminderProvider({ children }) {
         return updated;
       });
 
+      let clearedRemotely = false;
       if (isOnline && isSupabaseConfigured() && supabase) {
         try {
-          await supabase.from('reminders').delete().in('id', ids);
+          const { error } = await supabase.from('reminders').delete().in('id', ids);
+          if (!error) clearedRemotely = true;
         } catch (e) {
           console.warn('Network issue clearing completed from Supabase', e);
         }
       }
 
+      if (!clearedRemotely && isSupabaseConfigured()) {
+        ids.forEach((id) => enqueueMutation('delete', { id }));
+      }
+
       showToast(`Очищено ${ids.length} виконаних нагадувань`, 'success');
     },
-    [storageKey, isOnline, triggerHaptic, showToast]
+    [storageKey, isOnline, enqueueMutation, triggerHaptic, showToast]
   );
 
   return (

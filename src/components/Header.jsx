@@ -52,7 +52,7 @@ export function Header({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800">
+    <header className="app-header sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 transition-colors">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
         {/* Logo and Workspace Switcher */}
         <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 flex-1">

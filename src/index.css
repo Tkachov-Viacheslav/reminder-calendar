@@ -101,10 +101,34 @@ textarea:user-valid:not(:placeholder-shown) {
   view-transition-name: calendar-month;
 }
 
-::view-transition-old(calendar-month),
+::view-transition-old(calendar-month) {
+  animation: 160ms cubic-bezier(0.4, 0, 1, 1) both calendar-fade-out;
+}
+
 ::view-transition-new(calendar-month) {
-  animation-duration: 200ms;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation: 200ms cubic-bezier(0, 0, 0.2, 1) both calendar-fade-in;
+}
+
+@keyframes calendar-fade-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes calendar-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -114,9 +138,48 @@ textarea:user-valid:not(:placeholder-shown) {
   }
 }
 
-/* Size-aware styling via Container Queries */
-@container (min-width: 380px) {
+/* Modern Container Queries Architecture (Baseline Widely Available) */
+.calendar-container {
+  container-type: inline-size;
+  container-name: calendar;
+}
+
+.reminders-container {
+  container-type: inline-size;
+  container-name: reminders;
+}
+
+@container calendar (max-width: 360px) {
+  .calendar-day-cell {
+    padding: 0.25rem !important;
+    min-height: 2.25rem !important;
+  }
+  .calendar-weekday-header {
+    font-size: 0.65rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+}
+
+@container reminders (min-width: 420px) {
   .reminder-card-content {
     gap: 0.75rem;
+  }
+}
+
+/* Scroll-driven header elevation (shrinking-header-on-scroll) */
+@supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+  .app-header {
+    animation: header-scroll-elevate auto linear both;
+    animation-timeline: scroll(block root);
+    animation-range: 0px 60px;
+  }
+
+  @keyframes header-scroll-elevate {
+    to {
+      box-shadow: 0 6px 20px -3px rgba(15, 23, 42, 0.08);
+      border-bottom-color: rgba(226, 232, 240, 0.95);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
   }
 }

@@ -139,7 +139,7 @@ export function ReminderList({ onOpenNewReminder, onEditReminder }) {
   };
 
   return (
-    <Card variant="muted" className="flex flex-col h-full">
+    <Card variant="muted" className="flex flex-col h-full reminders-container">
       {/* List Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
         <div>

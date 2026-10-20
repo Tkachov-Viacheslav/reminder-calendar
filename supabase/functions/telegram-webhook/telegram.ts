@@ -161,3 +161,31 @@ export async function getBotChatStatus(
     return { isAdmin: false, status: 'error', isMember: false };
   }
 }
+
+export async function editTelegramMessage(
+  botToken: string,
+  chatId: string | number,
+  messageId: string | number,
+  text: string,
+  extraRows: any[] = []
+): Promise<boolean> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: Number(messageId),
+        text,
+        parse_mode: 'HTML',
+        reply_markup: extraRows.length > 0 ? { inline_keyboard: extraRows } : undefined,
+      }),
+    });
+    const data = await res.json();
+    return !!data?.ok;
+  } catch (err) {
+    console.warn('Failed to edit telegram message:', err);
+    return false;
+  }
+}
+

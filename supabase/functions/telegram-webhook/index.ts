@@ -1,11 +1,11 @@
-import { BOT_TOKEN, SITE_URL } from './config.ts';
+import { BOT_TOKEN, SITE_URL, WEBHOOK_SECRET } from './config.ts';
 import { getSupabaseClient } from './db.ts';
-import { tryParseQuickReminder } from './utils.ts';
 import {
   answerCallbackQuery,
   sendGroupMessage,
   getBotChatStatus,
   deleteTelegramMessage,
+  editTelegramMessage,
 } from './telegram.ts';
 import { ensureTeamExists, recordTeamMember, recordTopic } from './teams.ts';
 import {
@@ -16,6 +16,7 @@ import {
   handleTomorrowCommand,
   handleWeekCommand,
   handleQuickReminder,
+  handleAiReminderMessage,
   handleUserGroupsCommand,
   handleSyncCommand,
   handleBindCommand,
@@ -27,6 +28,17 @@ import {
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response('OK', { status: 200 });
+
+  if (WEBHOOK_SECRET) {
+    const incomingSecret = req.headers.get('x-telegram-bot-api-secret-token');
+    if (incomingSecret !== WEBHOOK_SECRET) {
+      console.warn('Unauthorized webhook invocation: secret token mismatch');
+      return new Response(JSON.stringify({ error: 'Unauthorized: invalid secret token' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  }
 
   if (!BOT_TOKEN) {
     console.error('TELEGRAM_BOT_TOKEN is not configured in Supabase secrets');
@@ -67,6 +79,23 @@ Deno.serve(async (req: Request) => {
           .update({ remind_at: snoozeDate, is_sent: false })
           .eq('id', reminderId);
         await answerCallbackQuery(BOT_TOKEN, cq.id, '💤 Відкладено на 15 хв!');
+      } else if (cq.data.startsWith('cancel_')) {
+        const reminderId = cq.data.replace('cancel_', '');
+        const supabase = getSupabaseClient();
+        await supabase
+          .from('reminders')
+          .delete()
+          .eq('id', reminderId)
+          .eq('user_id', String(chatId));
+        await answerCallbackQuery(BOT_TOKEN, cq.id, '🗑 Нагадування скасовано!');
+        if (cq.message?.chat?.id && cq.message?.message_id) {
+          await editTelegramMessage(
+            BOT_TOKEN,
+            cq.message.chat.id,
+            cq.message.message_id,
+            '❌ <i>Нагадування було успішно скасовано.</i>'
+          );
+        }
       } else {
         await answerCallbackQuery(BOT_TOKEN, cq.id);
       }
@@ -307,10 +336,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5.7 Quick reminder parser
-    const quickReminder = tryParseQuickReminder(text);
-    if (quickReminder) {
-      await handleQuickReminder(chatId, quickReminder, BOT_TOKEN, SITE_URL);
+    // 5.7 Intelligent AI Reminder Planner
+    if (text) {
+      await handleAiReminderMessage(chatId, text, message.from, BOT_TOKEN, SITE_URL);
     } else {
       await sendWelcome(chatId, message.from, BOT_TOKEN, SITE_URL);
     }
