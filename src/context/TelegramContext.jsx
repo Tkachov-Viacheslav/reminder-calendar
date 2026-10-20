@@ -15,6 +15,7 @@ import {
   verifyInitDataWithApi,
   healTelegramUserId,
 } from '../services/authService';
+import { supabase, isSupabaseConfigured } from '../services/supabase';
 
 const TelegramContext = createContext(null);
 
@@ -100,6 +101,33 @@ export function TelegramProvider({ children }) {
       }
     });
   }, [user]);
+
+  // 3. Синхронізація сесії Supabase Auth (запобігає «зомбі-авторизації» при закінченні терміну дії токена)
+  useEffect(() => {
+    if (!isSupabaseConfigured() || !supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if ((error || !session) && !initTelegramWebApp()) {
+        const stored = getStoredUser();
+        if (stored) {
+          console.warn('Supabase auth session is expired/missing. Clearing stale user auth.');
+          setUser(null);
+          clearStoredAuth();
+        }
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        clearStoredAuth();
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const activeUserId = user?.id ? String(user.id) : null;
 

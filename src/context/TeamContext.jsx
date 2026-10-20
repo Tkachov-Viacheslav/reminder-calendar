@@ -70,7 +70,7 @@ export function TeamProvider({ children }) {
     setLoading(true);
     try {
       // 1. Fetch team details
-      const { data: teamData } = await supabase
+      const { data: teamData, error: teamErr } = await supabase
         .from('teams')
         .select('*')
         .eq('id', activeTeamId)
@@ -127,8 +127,8 @@ export function TeamProvider({ children }) {
             setUserRole(effectiveRole);
           }
         }
-      } else {
-        // Команда більше не існує (її видалили з чату)
+      } else if (!teamErr && activeUserId) {
+        // Команда більше не існує (її видалили з чату), скидаємо лише при успішній відповіді без помилок доступу
         setCurrentTeam(null);
         setActiveTeamId(null);
         try {
@@ -137,6 +137,10 @@ export function TeamProvider({ children }) {
         setUserRole('owner');
         setTeamMembers([]);
         resetTopics();
+        return;
+      } else {
+        // Сталася помилка доступу/RLS або сесія закінчилася — не видаляємо збережену команду
+        setLoading(false);
         return;
       }
 
