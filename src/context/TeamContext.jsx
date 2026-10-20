@@ -42,11 +42,21 @@ export function TeamProvider({ children }) {
       return;
     }
     try {
-      const { data: memberRows, error } = await supabase
+      const cleanUsername = user?.username ? user.username.replace(/^@/, '') : '';
+      let query = supabase
         .from('team_members')
         .select('team_id, role, teams(*)')
-        .eq('telegram_id', activeUserId)
         .neq('role', 'blocked');
+
+      if (cleanUsername) {
+        query = query.or(
+          `telegram_id.eq.${activeUserId},telegram_id.eq.@${cleanUsername},username.ilike.${cleanUsername}`
+        );
+      } else {
+        query = query.eq('telegram_id', activeUserId);
+      }
+
+      const { data: memberRows, error } = await query;
 
       if (error) throw error;
       const teams = (memberRows || [])
@@ -56,7 +66,7 @@ export function TeamProvider({ children }) {
     } catch (err) {
       console.error('Failed to fetch user teams:', err);
     }
-  }, [activeUserId, isAuthenticated]);
+  }, [activeUserId, isAuthenticated, user]);
 
   const fetchCurrentTeamData = useCallback(async () => {
     if (!activeTeamId || !isSupabaseConfigured() || !supabase) {

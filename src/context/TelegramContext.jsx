@@ -137,7 +137,10 @@ export function TelegramProvider({ children }) {
       setHasSession(Boolean(session));
       if (event === 'SIGNED_OUT') {
         setUser(null);
-        clearStoredAuth();
+        try {
+          localStorage.removeItem(LOCAL_STORAGE_USER);
+          localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
+        } catch {}
       }
     });
 

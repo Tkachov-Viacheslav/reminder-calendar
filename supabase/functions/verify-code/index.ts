@@ -253,6 +253,22 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // Якщо користувач має username, зв'язуємо OIDC pairwise ID зі справжнім числовим Telegram ID
+      if (tgUsername) {
+        const { data: matchedMember } = await supabase
+          .from('team_members')
+          .select('telegram_id')
+          .ilike('username', tgUsername)
+          .not('telegram_id', 'like', '@%')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (matchedMember?.telegram_id && /^[0-9]+$/.test(matchedMember.telegram_id)) {
+          tgId = matchedMember.telegram_id;
+        }
+      }
+
       const userData = {
         id: tgId,
         first_name: tgFirstName,

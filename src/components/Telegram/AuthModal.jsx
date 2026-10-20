@@ -162,18 +162,6 @@ export function AuthModal({ isOpen, onClose }) {
             <div className="space-y-4">
               {/* Primary 1-Click Telegram Button */}
               <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <p className="font-semibold text-slate-900 dark:text-slate-100">
-                      Швидка авторизація в 1 клік
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                      Синхронізація розкладу без паролів через офіційний Telegram
-                    </p>
-                  </div>
-                </div>
-
                 <Button
                   onClick={handleTelegramOidc}
                   loading={tgLoading}

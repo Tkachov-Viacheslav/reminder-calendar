@@ -20,12 +20,24 @@ export function saveStoredUser(user) {
   } catch {}
 }
 
+let isSigningOut = false;
+
 export function clearStoredAuth() {
   try {
     localStorage.removeItem(LOCAL_STORAGE_USER);
     localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
-    if (supabase?.auth) {
-      supabase.auth.signOut().catch(() => {});
+    if (supabase?.auth && !isSigningOut) {
+      isSigningOut = true;
+      supabase.auth.getSession()
+        .then(({ data: { session } }) => {
+          if (session) {
+            return supabase.auth.signOut();
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          isSigningOut = false;
+        });
     }
   } catch {}
 }
