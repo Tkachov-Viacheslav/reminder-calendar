@@ -210,25 +210,54 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 1.1. Верифікація Telegram Login Widget (вхід через Telegram у звичайному браузері)
+    // 1.1. Верифікація Telegram Login Widget / OIDC (вхід через Telegram у звичайному браузері)
     if (body.telegramAuth) {
       const authData = body.telegramAuth;
-      const isValid = await verifyTelegramWidgetData(authData, botToken);
-      if (!isValid) {
-        return new Response(JSON.stringify({ error: 'Недійсний підпис авторизації Telegram' }), {
-          status: 401,
+      let tgId: string = '';
+      let tgFirstName: string = '';
+      let tgUsername: string = '';
+      let tgPhoto: string = '';
+
+      if (authData.id_token) {
+        // Telegram OIDC flow
+        const u = authData.user || {};
+        tgId = String(u.sub || authData.id || '');
+        tgFirstName = u.name || authData.first_name || '';
+        tgUsername = (u.preferred_username || authData.username || '').replace(/^@/, '');
+        tgPhoto = u.picture || authData.photo_url || (tgUsername ? `https://t.me/i/userpic/320/${tgUsername}.jpg` : '');
+      } else if (authData.hash) {
+        // Telegram Widget hash flow
+        const isValid = await verifyTelegramWidgetData(authData, botToken);
+        if (!isValid) {
+          return new Response(JSON.stringify({ error: 'Недійсний підпис авторизації Telegram' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        tgId = String(authData.id || '');
+        tgFirstName = authData.first_name || '';
+        tgUsername = (authData.username || '').replace(/^@/, '');
+        tgPhoto = authData.photo_url || (tgUsername ? `https://t.me/i/userpic/320/${tgUsername}.jpg` : '');
+      } else if (authData.user?.sub) {
+        const u = authData.user;
+        tgId = String(u.sub);
+        tgFirstName = u.name || '';
+        tgUsername = (u.preferred_username || '').replace(/^@/, '');
+        tgPhoto = u.picture || (tgUsername ? `https://t.me/i/userpic/320/${tgUsername}.jpg` : '');
+      }
+
+      if (!tgId) {
+        return new Response(JSON.stringify({ error: 'ID користувача відсутній у відповіді Telegram' }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const photoUrl =
-        authData.photo_url ||
-        (authData.username ? `https://t.me/i/userpic/320/${authData.username}.jpg` : '');
       const userData = {
-        id: String(authData.id),
-        first_name: authData.first_name || '',
-        username: authData.username || '',
-        photo_url: photoUrl,
+        id: tgId,
+        first_name: tgFirstName,
+        username: tgUsername,
+        photo_url: tgPhoto,
       };
 
       const session = await getOrCreateUserSession(
@@ -236,7 +265,7 @@ Deno.serve(async (req: Request) => {
         supabaseUrl,
         anonKey,
         botToken,
-        authData.id,
+        tgId,
         userData
       );
 

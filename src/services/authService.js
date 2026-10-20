@@ -117,7 +117,14 @@ export async function verifyInitDataWithApi(initData) {
 }
 
 export async function verifyTelegramAuthWithApi(authData) {
-  if (!authData || !authData.hash) return { success: false, error: 'Дані авторизації відсутні' };
+  if (!authData) return { success: false, error: 'Дані авторизації відсутні' };
+  const hasAuth = Boolean(
+    authData.id_token ||
+    authData.hash ||
+    authData.user?.sub ||
+    authData.id
+  );
+  if (!hasAuth) return { success: false, error: 'Дані авторизації відсутні' };
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dwzswscabsphwprptnos.supabase.co';
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
   const headers = { 'Content-Type': 'application/json' };
