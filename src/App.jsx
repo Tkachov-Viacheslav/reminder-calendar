@@ -16,20 +16,40 @@ import { useAppBadge } from './hooks/useAppBadge';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 
-// Lazy load modals to reduce initial memory footprint and bundle execution
-const ReminderModal = lazy(() =>
+// Безпечне завантаження модалок із захистом від оновлення чанків після деплою
+function lazyWithRetry(factory) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err) {
+      const isChunkError =
+        err?.message?.includes('Failed to fetch dynamically imported module') ||
+        err?.message?.includes('Importing a module script failed');
+      const hasReloaded = sessionStorage.getItem('chunk_retry');
+      if (isChunkError && !hasReloaded) {
+        sessionStorage.setItem('chunk_retry', 'true');
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      sessionStorage.removeItem('chunk_retry');
+      throw err;
+    }
+  });
+}
+
+const ReminderModal = lazyWithRetry(() =>
   import('./components/Reminders/ReminderModal').then((m) => ({ default: m.ReminderModal }))
 );
-const AuthModal = lazy(() =>
+const AuthModal = lazyWithRetry(() =>
   import('./components/Telegram/AuthModal').then((m) => ({ default: m.AuthModal }))
 );
-const TeamSettingsModal = lazy(() =>
+const TeamSettingsModal = lazyWithRetry(() =>
   import('./components/Team/TeamSettingsModal').then((m) => ({ default: m.TeamSettingsModal }))
 );
-const PersonalSettingsModal = lazy(() =>
+const PersonalSettingsModal = lazyWithRetry(() =>
   import('./components/common/PersonalSettingsModal').then((m) => ({ default: m.PersonalSettingsModal }))
 );
-const AiPlannerModal = lazy(() =>
+const AiPlannerModal = lazyWithRetry(() =>
   import('./components/AI/AiPlannerModal').then((m) => ({ default: m.AiPlannerModal }))
 );
 

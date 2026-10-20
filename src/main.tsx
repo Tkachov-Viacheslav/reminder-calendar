@@ -6,6 +6,21 @@ import { initSentry } from './services/sentry';
 
 initSentry();
 
+// Автоматичне оновлення при розгортанні нової версії на Vercel (запобігає 404 для старих чанків)
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  const hasReloaded = sessionStorage.getItem('vite_preload_reload');
+  if (!hasReloaded) {
+    sessionStorage.setItem('vite_preload_reload', 'true');
+    window.location.reload();
+  }
+});
+
+try {
+  sessionStorage.removeItem('vite_preload_reload');
+  sessionStorage.removeItem('chunk_retry');
+} catch {}
+
 const rootElement = document.getElementById('root');
 if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
