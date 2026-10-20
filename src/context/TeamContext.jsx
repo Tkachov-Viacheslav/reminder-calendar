@@ -8,7 +8,7 @@ import { LOCAL_STORAGE_ACTIVE_TEAM } from '../utils/constants';
 const TeamContext = createContext(null);
 
 export function TeamProvider({ children }) {
-  const { user, activeUserId, triggerHaptic } = useTelegram();
+  const { user, activeUserId, isAuthenticated, triggerHaptic } = useTelegram();
   const { showToast } = useToast();
   const [userTeams, setUserTeams] = useState([]);
   const [activeTeamId, setActiveTeamId] = useState(() => {
@@ -56,7 +56,7 @@ export function TeamProvider({ children }) {
     } catch (err) {
       console.error('Failed to fetch user teams:', err);
     }
-  }, [activeUserId]);
+  }, [activeUserId, isAuthenticated]);
 
   const fetchCurrentTeamData = useCallback(async () => {
     if (!activeTeamId || !isSupabaseConfigured() || !supabase) {

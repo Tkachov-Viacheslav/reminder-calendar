@@ -12,7 +12,7 @@ import { getStorageItem, setStorageItem } from '../services/dbStorage';
 const ReminderContext = createContext(null);
 
 export function ReminderProvider({ children }) {
-  const { user, activeUserId, triggerHaptic } = useTelegram();
+  const { user, activeUserId, isAuthenticated, triggerHaptic } = useTelegram();
   const { activeTeamId } = useTeam();
   const { showToast } = useToast();
   const storageKey = activeTeamId ? `${LOCAL_STORAGE_KEY}_${activeTeamId}` : LOCAL_STORAGE_KEY;
@@ -93,7 +93,7 @@ export function ReminderProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [activeUserId, activeTeamId, storageKey, loadLocalReminders, fetchCategories]);
+  }, [activeUserId, isAuthenticated, activeTeamId, storageKey, loadLocalReminders, fetchCategories]);
 
   useEffect(() => {
     fetchReminders();

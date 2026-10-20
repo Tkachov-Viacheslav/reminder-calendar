@@ -22,6 +22,10 @@ const TelegramContext = createContext(null);
 export function TelegramProvider({ children }) {
   const [isInTelegram, setIsInTelegram] = useState(false);
   const [user, setUser] = useState(() => getStoredUser());
+  const [hasSession, setHasSession] = useState(() => {
+    if (!isSupabaseConfigured() || !supabase) return true;
+    return false;
+  });
 
   const loginWithTelegram = useCallback((authResult) => {
     const formattedUser = formatTelegramUser(authResult);
@@ -42,6 +46,7 @@ export function TelegramProvider({ children }) {
       if (result.success && result.user) {
         setUser(result.user);
         saveStoredUser(result.user);
+        setHasSession(true);
         triggerHaptic('success');
         return result;
       }
@@ -56,6 +61,7 @@ export function TelegramProvider({ children }) {
   const logout = useCallback(() => {
     triggerHaptic('medium');
     setUser(null);
+    setHasSession(false);
     clearStoredAuth();
   }, []);
 
@@ -104,9 +110,17 @@ export function TelegramProvider({ children }) {
 
   // 3. Синхронізація сесії Supabase Auth
   useEffect(() => {
-    if (!isSupabaseConfigured() || !supabase) return;
+    if (!isSupabaseConfigured() || !supabase) {
+      setHasSession(true);
+      return;
+    }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setHasSession(Boolean(session));
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      setHasSession(Boolean(session));
       if (event === 'SIGNED_OUT') {
         setUser(null);
         clearStoredAuth();
@@ -119,13 +133,15 @@ export function TelegramProvider({ children }) {
   }, []);
 
   const activeUserId = user?.id ? String(user.id) : null;
+  const isAuthenticated = Boolean(activeUserId && (isInTelegram || hasSession));
 
   return (
     <TelegramContext.Provider
       value={{
         isInTelegram,
         user,
-        isAuthenticated: Boolean(activeUserId),
+        isAuthenticated,
+        hasSession,
         activeUserId,
         loginWithCode,
         loginWithTelegram,
