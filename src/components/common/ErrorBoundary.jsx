@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 import { Button } from '../ui';
+import { captureClientError } from '../../services/sentry';
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -14,6 +15,7 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('ErrorBoundary captured runtime error:', error, errorInfo);
+    captureClientError(error, errorInfo);
     this.setState({ errorInfo });
   }
 

@@ -13,6 +13,8 @@ import { Card, Badge } from './components/ui';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './context/ToastContext';
 import { useAppBadge } from './hooks/useAppBadge';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Lazy load modals to reduce initial memory footprint and bundle execution
 const ReminderModal = lazy(() =>
@@ -299,6 +301,8 @@ export default function App() {
           <TeamProvider>
             <ReminderProvider>
               <CalendarContent />
+              <Analytics />
+              <SpeedInsights />
             </ReminderProvider>
           </TeamProvider>
         </TelegramProvider>
