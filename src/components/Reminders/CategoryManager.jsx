@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Check, Tag } from 'lucide-react';
+import { Plus, Trash2, Check } from 'lucide-react';
 import {
   SYSTEM_CATEGORIES,
   CATEGORY_COLOR_PALETTES,
@@ -50,17 +50,6 @@ export function CategoryManager({ isTeam = false, canEdit = true }) {
 
   return (
     <div className="space-y-4 text-xs">
-      {/* Description */}
-      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
-          <Tag className="w-4 h-4 text-indigo-500" />
-          <span>{isTeam ? 'Категорії команди' : 'Особисті категорії'}</span>
-        </div>
-        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-          Створюйте власні категорії та призначайте їм унікальні кольори для швидкого візуального розрізнення в календарі.
-        </p>
-      </div>
-
       {/* Add New Category Form */}
       {canEdit && (
         <form

@@ -9,16 +9,11 @@ import {
   Users,
   CheckSquare,
   AlertTriangle,
-  Key,
   ArrowRight,
   Trash2,
 } from 'lucide-react';
 import { Modal, Button, Badge } from '../ui';
-import {
-  parseReminderWithAi,
-  getStoredGeminiApiKey,
-  setStoredGeminiApiKey,
-} from '../../services/aiService';
+import { parseReminderWithAi } from '../../services/aiService';
 import { trackUserAction } from '../../services/analytics';
 import { getCategoryMeta } from '../../utils/constants';
 
@@ -46,8 +41,6 @@ export function AiPlannerModal({
   const [aiMessage, setAiMessage] = useState('');
   const [outOfScope, setOutOfScope] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [needsApiKey, setNeedsApiKey] = useState(false);
-  const [inputApiKey, setInputApiKey] = useState('');
 
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
@@ -173,11 +166,7 @@ export function AiPlannerModal({
         setErrorMsg(result.message || 'Не вдалося розпізнати завдання.');
       }
     } catch (err) {
-      if (err.code === 'GEMINI_API_KEY_REQUIRED' || err.message?.includes('GEMINI_API_KEY_REQUIRED')) {
-        setNeedsApiKey(true);
-      } else {
-        setErrorMsg(err.message || 'Помилка звернення до ШІ.');
-      }
+      setErrorMsg(err.message || 'Помилка звернення до ШІ.');
     } finally {
       setIsLoading(false);
     }
@@ -196,12 +185,6 @@ export function AiPlannerModal({
       }
       handleSubmit();
     }
-  };
-
-  const handleSaveApiKey = () => {
-    setStoredGeminiApiKey(inputApiKey);
-    setNeedsApiKey(false);
-    handleSubmit();
   };
 
   const handleRemoveReminderItem = (index) => {
@@ -247,40 +230,6 @@ export function AiPlannerModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="✨ ШІ-планувальник розкладу" size="md">
       <div className="space-y-4">
-        {/* API Key prompt if missing */}
-        {needsApiKey && (
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-amber-900 dark:text-amber-200">
-              <Key className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Потрібен Gemini API Key</span>
-            </div>
-            <p className="text-slate-600 dark:text-slate-400">
-              Вкажіть ваш безкоштовний ключ від{' '}
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-indigo-600 dark:text-indigo-400 underline font-medium"
-              >
-                Google AI Studio
-              </a>
-              :
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={inputApiKey}
-                onChange={(e) => setInputApiKey(e.target.value)}
-                className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
-              />
-              <Button size="sm" onClick={handleSaveApiKey} disabled={!inputApiKey.trim()}>
-                Зберегти
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Input prompt area */}
         <form onSubmit={handleSubmit} className="space-y-2">
           <div className="flex items-center justify-between">

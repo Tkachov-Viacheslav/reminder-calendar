@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { text, context, apiKey } = await req.json();
+    const { text, context } = await req.json();
 
     if (!text || !text.trim()) {
       return new Response(JSON.stringify({ error: 'Text prompt is required' }), {
@@ -132,7 +132,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const geminiKey =
-      apiKey || Deno.env.get('GEMINI_API_KEY') || 'AIzaSyDnD6HQAJzrrxv_Nuv3BOYbXzi1Uufc_eQ';
+      Deno.env.get('GEMINI_API_KEY') || 'AIzaSyDnD6HQAJzrrxv_Nuv3BOYbXzi1Uufc_eQ';
 
     if (!geminiKey) {
       return new Response(

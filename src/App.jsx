@@ -52,6 +52,9 @@ const PersonalSettingsModal = lazyWithRetry(() =>
 const AiPlannerModal = lazyWithRetry(() =>
   import('./components/AI/AiPlannerModal').then((m) => ({ default: m.AiPlannerModal }))
 );
+const FeedbackModal = lazyWithRetry(() =>
+  import('./components/Feedback/FeedbackModal').then((m) => ({ default: m.FeedbackModal }))
+);
 
 function CalendarContent() {
   const {
@@ -79,6 +82,54 @@ function CalendarContent() {
   const [isTeamSettingsOpen, setIsTeamSettingsOpen] = useState(false);
   const [isPersonalSettingsOpen, setIsPersonalSettingsOpen] = useState(false);
   const [isAiPlannerOpen, setIsAiPlannerOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [initialFeedbackFile, setInitialFeedbackFile] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.openFeedbackModal = (file = null) => {
+        if (file) setInitialFeedbackFile(file);
+        setIsFeedbackModalOpen(true);
+      };
+    }
+  }, []);
+
+  // Глобальна вставка скріншота з буфера обміну (Ctrl+V) у будь-якій точці додатку
+  useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      // Якщо користувач вставляє текст у звичайний інпут, не перехоплюємо текст
+      const targetTag = e.target?.tagName?.toLowerCase();
+      const isInput = targetTag === 'input' || targetTag === 'textarea';
+
+      let imageFile = null;
+      const files = e.clipboardData?.files;
+      if (files && files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          if (files[i].type.startsWith('image/')) {
+            imageFile = files[i];
+            break;
+          }
+        }
+      }
+      if (!imageFile && e.clipboardData?.items) {
+        for (let i = 0; i < e.clipboardData.items.length; i++) {
+          if (e.clipboardData.items[i].type.startsWith('image/')) {
+            imageFile = e.clipboardData.items[i].getAsFile();
+            if (imageFile) break;
+          }
+        }
+      }
+
+      if (imageFile) {
+        e.preventDefault();
+        setInitialFeedbackFile(imageFile);
+        setIsFeedbackModalOpen(true);
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, []);
 
   const handleOpenNewReminder = () => {
     setEditingReminder(null);
@@ -295,6 +346,7 @@ function CalendarContent() {
           <PersonalSettingsModal
             isOpen={isPersonalSettingsOpen}
             onClose={() => setIsPersonalSettingsOpen(false)}
+            onOpenFeedback={() => setIsFeedbackModalOpen(true)}
           />
         )}
         {isAiPlannerOpen && (
@@ -306,6 +358,16 @@ function CalendarContent() {
             teamMembers={teamMembers}
             categories={customCategories}
             currentWorkspace={currentTeam ? currentTeam.title : 'personal'}
+          />
+        )}
+        {isFeedbackModalOpen && (
+          <FeedbackModal
+            isOpen={isFeedbackModalOpen}
+            initialFile={initialFeedbackFile}
+            onClose={() => {
+              setIsFeedbackModalOpen(false);
+              setInitialFeedbackFile(null);
+            }}
           />
         )}
       </Suspense>

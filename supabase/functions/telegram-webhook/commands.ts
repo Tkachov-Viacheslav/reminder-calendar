@@ -24,3 +24,7 @@ export {
   handleBindCommand,
   handleTopicCommand,
 } from './commands/forum.ts';
+
+export {
+  handleBugReportCommand,
+} from './commands/feedback.ts';

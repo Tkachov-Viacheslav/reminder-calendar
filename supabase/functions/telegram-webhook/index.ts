@@ -24,6 +24,7 @@ import {
   handleTeamCommand,
   handleAddMemberCommand,
   handleMyChatMemberUpdate,
+  handleBugReportCommand,
 } from './commands.ts';
 
 Deno.serve(async (req: Request) => {
@@ -263,6 +264,30 @@ Deno.serve(async (req: Request) => {
     }
 
     // 5. Private Chat Commands
+    // 5.0 Bug report / feedback command or photo report
+    const isBugReport =
+      lowerText.startsWith('/bug') ||
+      lowerText.startsWith('/feedback') ||
+      lowerText.startsWith('/помилка') ||
+      lowerText.startsWith('/відгук') ||
+      lowerText === 'баг' ||
+      lowerText === 'відгук' ||
+      (message.photo &&
+        (lowerText.includes('баг') ||
+          lowerText.includes('помилка') ||
+          lowerText.includes('відгук') ||
+          lowerText.includes('bug') ||
+          lowerText.includes('feedback') ||
+          lowerText.startsWith('/bug')));
+
+    if (isBugReport) {
+      await handleBugReportCommand(chatId, message, BOT_TOKEN, SITE_URL);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // 5.1 Auth code requests
     const isCodeRequest =
       lowerText.startsWith('/code') ||
@@ -336,9 +361,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5.7 Intelligent AI Reminder Planner
+    // 5.7 Intelligent AI Reminder Planner or Direct Photo Feedback
     if (text) {
       await handleAiReminderMessage(chatId, text, message.from, BOT_TOKEN, SITE_URL);
+    } else if (message.photo && message.photo.length > 0) {
+      await handleBugReportCommand(chatId, message, BOT_TOKEN, SITE_URL);
     } else {
       await sendWelcome(chatId, message.from, BOT_TOKEN, SITE_URL);
     }

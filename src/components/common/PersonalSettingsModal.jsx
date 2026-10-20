@@ -1,29 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Sparkles, Key, Check } from 'lucide-react';
-import { Modal, Button } from '../ui';
+import React, { useEffect } from 'react';
+import { Settings, MessageSquareHeart } from 'lucide-react';
+import { Modal } from '../ui';
 import { CategoryManager } from '../Reminders/CategoryManager';
 import { useTelegram } from '../../context/TelegramContext';
-import { getStoredGeminiApiKey, setStoredGeminiApiKey } from '../../services/aiService';
 
-export function PersonalSettingsModal({ isOpen, onClose }) {
+export function PersonalSettingsModal({ isOpen, onClose, onOpenFeedback }) {
   const { setClosingConfirmation } = useTelegram();
-  const [geminiKey, setGeminiKey] = useState('');
-  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setClosingConfirmation?.(true);
-      setGeminiKey(getStoredGeminiApiKey());
-      setIsSaved(false);
       return () => setClosingConfirmation?.(false);
     }
   }, [isOpen, setClosingConfirmation]);
-
-  const handleSaveKey = () => {
-    setStoredGeminiApiKey(geminiKey);
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 2500);
-  };
 
   if (!isOpen) return null;
 
@@ -35,48 +24,38 @@ export function PersonalSettingsModal({ isOpen, onClose }) {
       icon={<Settings className="w-5 h-5 text-indigo-500" />}
       maxWidth="max-w-md"
     >
-      <div className="p-4 space-y-5">
-        {/* Gemini AI Settings Section */}
-        <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-50/70 to-violet-50/70 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200/80 dark:border-indigo-900/60 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                Google Gemini ШІ
-              </h4>
-            </div>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noreferrer"
-              className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
-            >
-              Отримати ключ ↗
-            </a>
-          </div>
-          <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-            Вкажіть API ключ для активації розумного створення розкладу голосом та за шаблонами.
-          </p>
-          <div className="flex gap-1.5">
-            <div className="relative flex-1">
-              <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={geminiKey}
-                onChange={(e) => setGeminiKey(e.target.value)}
-                className="w-full pl-8 pr-2.5 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              />
-            </div>
-            <Button size="sm" onClick={handleSaveKey} className="shrink-0 gap-1">
-              {isSaved ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : null}
-              <span>{isSaved ? 'Збережено' : 'Зберегти'}</span>
-            </Button>
-          </div>
-        </div>
-
+      <div className="p-4 space-y-4">
         {/* Categories Section */}
         <CategoryManager isTeam={false} canEdit={true} />
+
+        {/* Feedback / Bug Report Action Block */}
+        <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onOpenFeedback?.();
+            }}
+            className="w-full flex items-center justify-between p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 hover:bg-indigo-100/80 dark:hover:bg-indigo-900/50 border border-indigo-200/60 dark:border-indigo-900/40 text-left transition-all group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-500/20">
+                <MessageSquareHeart className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                  Повідомити про проблему або відгук
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Надіслати відгук чи скріншот розробникам
+                </div>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 group-hover:translate-x-0.5 transition-transform">
+              Відкрити →
+            </span>
+          </button>
+        </div>
       </div>
     </Modal>
   );

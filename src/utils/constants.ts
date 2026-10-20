@@ -38,7 +38,6 @@ export const LOCAL_STORAGE_USER = 'reminder_auth_user_v1';
 export const LOCAL_STORAGE_CHAT_ID = 'reminder_telegram_chat_id';
 export const LOCAL_STORAGE_CUSTOM_CATEGORIES = 'reminder_custom_categories_v1';
 export const LOCAL_STORAGE_ACTIVE_TEAM = 'reminder_active_team_v1';
-export const LOCAL_STORAGE_GEMINI_API_KEY = 'reminder_gemini_api_key';
 
 export const CATEGORY_COLOR_PALETTES: ColorPalette[] = [
   { id: 'emerald', label: 'Смарагдовий', color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30', dotColor: 'bg-emerald-500', hex: '#10b981' },

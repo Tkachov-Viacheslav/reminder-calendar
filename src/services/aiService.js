@@ -1,31 +1,16 @@
-import { LOCAL_STORAGE_GEMINI_API_KEY } from '../utils/constants';
 import { traceAgentExecution } from './sentry';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://dwzswscabsphwprptnos.supabase.co';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export function getStoredGeminiApiKey() {
-  try {
-    const fromStorage = localStorage.getItem(LOCAL_STORAGE_GEMINI_API_KEY);
-    if (fromStorage && fromStorage.trim()) return fromStorage.trim();
-  } catch {}
-  return '';
-}
-
-export function setStoredGeminiApiKey(key) {
-  try {
-    const trimmed = String(key || '').trim();
-    if (trimmed) {
-      localStorage.setItem(LOCAL_STORAGE_GEMINI_API_KEY, trimmed);
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_GEMINI_API_KEY);
-    }
-  } catch (err) {
-    console.error('Failed to save Gemini API key in localStorage:', err);
+// Очищення будь-яких застарілих користувацьких ключів із браузера
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    localStorage.removeItem('reminder_gemini_api_key');
   }
-}
+} catch {}
 
-export async function parseReminderWithAi({ text, context, customApiKey, conversationId }) {
+export async function parseReminderWithAi({ text, context, conversationId }) {
   const activeConversationId = conversationId || `conv_planner_${Date.now()}`;
 
   return await traceAgentExecution(
@@ -38,7 +23,6 @@ export async function parseReminderWithAi({ text, context, customApiKey, convers
       systemInstruction: 'Ти — інтелектуальний планувальник нагадувань та подій у календарі.',
     },
     async () => {
-      const apiKey = (customApiKey || getStoredGeminiApiKey()).trim();
       const endpoint = `${SUPABASE_URL}/functions/v1/ai-planner`;
 
       const headers = {
@@ -55,7 +39,6 @@ export async function parseReminderWithAi({ text, context, customApiKey, convers
         body: JSON.stringify({
           text,
           context,
-          apiKey: apiKey || undefined,
         }),
       });
 
