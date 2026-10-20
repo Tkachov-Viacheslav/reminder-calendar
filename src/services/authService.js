@@ -29,12 +29,9 @@ export function clearStoredAuth() {
     localStorage.removeItem(LOCAL_STORAGE_ACTIVE_TEAM);
     if (supabase?.auth && !isSigningOut) {
       isSigningOut = true;
-      supabase.auth.getSession()
-        .then(({ data: { session } }) => {
-          if (session) {
-            return supabase.auth.signOut();
-          }
-        })
+      // Використовуємо локальний scope для очищення сесії без помилки 403 на сервері
+      supabase.auth
+        .signOut({ scope: 'local' })
         .catch(() => {})
         .finally(() => {
           isSigningOut = false;

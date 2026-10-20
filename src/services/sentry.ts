@@ -36,18 +36,11 @@ export function initSentry(): void {
       environment: import.meta.env.MODE || 'production',
     });
 
-    // Відправляємо структурований лог для верифікації пайплайну Sentry Logs
+    // Відправляємо структурований лог для Sentry Logs
     Sentry.logger.info('Календар-нагадування успішно ініціалізовано', {
       app: 'reminder-calendar',
       version: '1.0.1',
     });
-    Sentry.captureMessage('Sentry logging успішно підключено', 'info');
-    Sentry.flush(2000).catch(() => {});
-
-    // Автоматично запускаємо тестовий Root Span для формування першого профілю
-    setTimeout(() => {
-      triggerManualProfile().catch(() => {});
-    }, 1500);
 
     if (typeof window !== 'undefined') {
       const win = window as unknown as {
