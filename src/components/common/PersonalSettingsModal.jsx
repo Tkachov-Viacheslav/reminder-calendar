@@ -77,6 +77,20 @@ export function PersonalSettingsModal({ isOpen, onClose }) {
 
         {/* Categories Section */}
         <CategoryManager isTeam={false} canEdit={true} />
+
+        {/* Sentry Test Section */}
+        <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800 flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400">
+          <span>Тест системи збоїв (Sentry):</span>
+          <button
+            type="button"
+            onClick={() => {
+              throw new Error('This is your first error!');
+            }}
+            className="px-2.5 py-1 text-[11px] font-medium text-rose-500 hover:text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-lg transition-colors cursor-pointer"
+          >
+            Break the world
+          </button>
+        </div>
       </div>
     </Modal>
   );
